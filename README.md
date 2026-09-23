@@ -1,22 +1,18 @@
 # MSS-Capytaine
 
-MSS-Capytaine is a Python add-on for the
-[Marine Systems Simulator (MSS)](https://github.com/cybergalactic/MSS). It uses
-the open-source [Capytaine](https://capytaine.org/) boundary-element solver to
-compute six-degree-of-freedom linear potential-flow hydrodynamics and exports
-the results as the standard MATLAB `vessel` structure used by MSS.
+MSS-Capytaine is a Python add-on for the [Marine Systems Simulator (MSS)](https://github.com/cybergalactic/MSS). It uses the open-source [Capytaine](https://capytaine.org/) boundary-element solver to compute 6-DOF linear potential-flow hydrodynamics and exports the results as the standard MATLAB/Octave `vessel` structure used by MSS.
 
-The project provides an open-source hydrodynamic-data workflow for MSS users
-who do not have access to the commercial ShipX or WAMIT solvers. Capytaine
-performs the boundary-element calculations; MSS provides the MATLAB and GNU
-Octave functions for analysis, model reduction, plotting, and time-domain
-simulation.
+The project provides an open-source hydrodynamic-data workflow for MSS users who do not have access to the commercial ShipX or WAMIT solvers. Capytaine
+performs the boundary-element calculations; MSS provides the MATLAB and GNU Octave functions for analysis, model reduction, plotting, and time-domain
+simulation. 
 
-The included example is a synthetic monohull defined by offset points. It is
-intended to demonstrate the complete Capytaine-to-MSS workflow rather than to
-represent a validated vessel design.
+The included example is a synthetic monohull defined by offset points. It is intended to demonstrate the complete Capytaine-to-MSS workflow rather than to
+represent a validated vessel design. 
 
-## MSS integration
+Author: Thor I. Fossen
+Date: 2026-09-23
+
+## MSS Toolbox Integration
 
 The integration keeps the Python solver and MSS loosely coupled through a
 MATLAB data file:
@@ -165,7 +161,7 @@ water depth, which is the default when `water_depth_m` is absent or `null`.
 `number_of_stations` controls resolution along the hull. Check Capytaine's
 mesh-resolution warnings at the highest wave frequencies.
 
-## Viscous damping
+## Viscous damping correction
 
 The `viscous_damping` object specifies damping added to the potential-flow
 radiation damping `B(ω)`. Its six nonnegative entries are viscous time
