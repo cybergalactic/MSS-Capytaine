@@ -5,9 +5,10 @@ MSS-Capytaine is a Python add-on for the [Marine Systems Simulator (MSS)](https:
 The project provides an open-source hydrodynamic-data workflow for MSS users without access to the commercial ShipX or WAMIT solvers. Capytaine performs the boundary-element calculations; MSS provides the MATLAB and GNU Octave functions for analysis, model reduction, plotting, and time-domain
 simulation. 
 
-The included example is a synthetic monohull defined by offset points. It is intended to demonstrate the complete Capytaine-to-MSS workflow rather than to represent a validated vessel design. 
+The included example is a synthetic monohull defined by offset points. It demonstrates the complete Capytaine-to-MSS workflow rather than representing a validated vessel design. 
 
 Author: Thor I. Fossen
+
 Date: 2026-09-23
 
 ## MSS Toolbox Integration
@@ -84,8 +85,7 @@ source .venv/bin/activate
 python -m pip install capytaine numpy scipy xarray matplotlib
 ```
 
-On Windows, activate the environment with `.venv\Scripts\activate` instead.
-MSS is not required to run the Python calculation, but it is required for the
+On Windows, activate the environment with `.venv\Scripts\activate` instead. MSS is not required to run the Python calculation, but it is required for the
 MATLAB/Octave post-processing workflow.
 
 ## Quick start
@@ -99,8 +99,7 @@ python main.py
 `main.py` reads `capytaineTestShip/config.json` and writes the generated files
 to `capytaineTestShip/results/`.
 
-To inspect the result using MSS, add MSS and its subfolders to the MATLAB or
-GNU Octave path, then run the supplied integration example:
+To inspect the result using MSS, add MSS and its subfolders to the MATLAB or GNU Octave path, then run the supplied integration example:
 
 ```matlab
 addpath(genpath('/path/to/MSS'))
@@ -136,39 +135,24 @@ python plot_results.py
 python plot_results.py --heading 90 --show
 ```
 
-The script reads `capytaineTestShip/results/capytaineTestShip.mat` and saves
-six PNG figures in `capytaineTestShip/results/plots/`. It does not rerun the
-hydrodynamics or change the result file. The coefficient plots show the
-infinite-frequency values as separate markers at the `10 rad/s` label;
+The script reads `capytaineTestShip/results/capytaineTestShip.mat` and saves six PNG figures in `capytaineTestShip/results/plots/`. It does not rerun the
+hydrodynamics or change the result file. The coefficient plots show the infinite-frequency values as separate markers at the `10 rad/s` label;
 RAO plots use only finite frequencies.
 
 ## Inputs
 
-`capytaineTestShip/offset_points.csv` contains the columns
-`x_m,z_m,half_breadth_m`. The origin is at midships on the design waterline;
-`x` points aft, `z` points upward, and half breadth is nonnegative. Each
+`capytaineTestShip/offset_points.csv` contains the columns `x_m,z_m,half_breadth_m`. The origin is at midships on the design waterline; `x` points aft, `z` points upward, and half breadth is nonnegative. Each
 section runs from keel to waterline (`z = 0`).
 
-`capytaineTestShip/config.json` specifies the mesh resolution, mass, radii of
-gyration (or an inertia-matrix CSV), center of mass, wave frequencies, and
-headings. Set `rotation_center_m` equal to `center_of_mass_m` for the
-CG-referenced export. The limiting-frequency calculations require infinite
+`capytaineTestShip/config.json` specifies the mesh resolution, mass, radii of gyration (or an inertia-matrix CSV), center of mass, wave frequencies, and
+headings. Set `rotation_center_m` equal to `center_of_mass_m` for the CG-referenced export. The limiting-frequency calculations require infinite
 water depth, which is the default when `water_depth_m` is absent or `null`.
 
-`samples_per_section` controls resolution around each half section, while
-`number_of_stations` controls resolution along the hull. Check Capytaine's
-mesh-resolution warnings at the highest wave frequencies.
+`samples_per_section` controls resolution around each half section, while `number_of_stations` controls resolution along the hull. Check Capytaine's mesh-resolution warnings at the highest wave frequencies.
 
 ## Viscous damping correction
 
-The `viscous_damping` object specifies damping added to the potential-flow
-radiation damping `B(ω)`. Its six nonnegative entries are viscous time
-constants in seconds for surge, sway, and yaw, and additional dimensionless
-damping ratios for heave, roll, and pitch. Surge, sway, and yaw have no
-hydrostatic restoring; their time constants specify the intended diagonal
-viscous damping, including yaw. A zero in any entry disables added damping
-for that DOF. The test ship retains its surge/sway/yaw time constants, uses
-additional damping ratios of 0.2 in roll and 0.1 in pitch, and adds no viscous
+The `viscous_damping` object specifies damping added to the potential-flow radiation damping `B(ω)`. Its six nonnegative entries are viscous time constants in seconds for surge, sway, and yaw, and additional dimensionless damping ratios for heave, roll, and pitch. Surge, sway, and yaw have no hydrostatic restoring; their time constants specify the intended diagonal viscous damping, including yaw. A zero in any entry disables added damping for that DOF. The test ship retains its surge/sway/yaw time constants, uses additional damping ratios of 0.2 in roll and 0.1 in pitch, and adds no viscous
 damping in heave:
 
 ```json
@@ -182,36 +166,25 @@ damping in heave:
 }
 ```
 
-The exported `Bv` is diagonal at the center of gravity and constant across
-all coefficient frequencies. For a nonzero time constant `Ti` in surge,
-sway, or yaw, `Bvii = (MRBii + Aii(0)) / Ti`. For heave, roll, and pitch,
-`Bvii = 2 ζv,i ωn,i (MRBii + Aii(ωn,i))`, where `ζv,i` is the
-**additional** ratio and `ωn,i` is the estimated undamped natural frequency
-from `MRB + A(ω)` and `C`. Nothing is subtracted from `B(ω)`.
-A smaller nonzero time constant means more viscous damping. If a required
-natural frequency lies beyond the finite calculation grid, extend
+The exported `Bv` is diagonal at the center of gravity and constant across all coefficient frequencies. For a nonzero time constant `Ti` in surge,
+sway, or yaw, `Bvii = (MRBii + Aii(0)) / Ti`. For heave, roll, and pitch, `Bvii = 2 ζv,i ωn,i (MRBii + Aii(ωn,i))`, where `ζv,i` is the
+**additional** ratio and `ωn,i` is the estimated undamped natural frequency from `MRB + A(ω)` and `C`. Nothing is subtracted from `B(ω)`.
+A smaller nonzero time constant means more viscous damping. If a required natural frequency lies beyond the finite calculation grid, extend
 `omega_rad_s` rather than extrapolating.
 
-The motion RAOs include `B(ω) + Bv`; force RAOs are unchanged. The total
-damping remains frequency-dependent because `B(ω)` varies. Set all six
-entries to zero, or `viscous_damping` to `null`, to export zero `Bv`.
-The old `total_damping` settings are rejected: their values must be
+The motion RAOs include `B(ω) + Bv`; force RAOs are unchanged. The total damping remains frequency-dependent because `B(ω)` varies. Set all six
+entries to zero, or `viscous_damping` to `null`, to export zero `Bv`. The old `total_damping` settings are rejected: their values must be
 reconsidered before using the additive model.
 
 ## Outputs
 
-`capytaineTestShip/results/capytaineTestShip.mat` contains `MRB`, `A`, `B`,
-`Bv`, `C`, force and motion RAOs, frequencies, and headings in MSS
-forward-starboard-down axes at the center of gravity. The hydrostatic
-restoring matrix `C` has entries only in the heave, roll, and pitch block.
+`capytaineTestShip/results/capytaineTestShip.mat` contains `MRB`, `A`, `B`, `Bv`, `C`, force and motion RAOs, frequencies, and headings in MSS
+forward-starboard-down axes at the center of gravity. The hydrostatic restoring matrix `C` has entries only in the heave, roll, and pitch block.
 
-The coefficient frequency grid includes zero frequency and the
-infinite-frequency radiation solution, labeled `10 rad/s`. The force and
-motion RAOs use only the positive finite frequencies below `10 rad/s`.
+The coefficient frequency grid includes zero frequency and the infinite-frequency radiation solution, labeled `10 rad/s`. The force andmotion RAOs use only the positive finite frequencies below `10 rad/s`.
 Headings solved from 0° to 180° are mirrored to a full 0° to 350° set.
 
-The results directory also contains `hydrostatics.json` and the generated
-hull panels in `.mat` and `.npz` formats. The hull and inertia values are
+The results directory also contains `hydrostatics.json` and the generated hull panels in `.mat` and `.npz` formats. The hull and inertia values are
 synthetic demonstration data; numerical accuracy depends on mesh resolution.
 
 ## Current scope and limitations
