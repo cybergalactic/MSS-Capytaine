@@ -1,0 +1,28 @@
+{
+  "offset_points_csv": "offset_points.csv",
+  "samples_per_section": 20,
+  "number_of_stations": 50,
+  "body_name": "CapytaineTestShip",
+  "write_mss_vessel": true,
+  "rotation_center_m": [0.0, 0.0, -1.0],
+  "center_of_mass_m": [0.0, 0.0, -1.0],
+  "mass_kg": 141954.8,
+  "R44_m": 2.4194,
+  "R55_m": 5.8156,
+  "R66_m": 6.2470,
+  "total_damping": {
+    "surge_time_constant_s": 10,
+    "sway_time_constant_s": 50,
+    "heave_damping_ratio": 0.2,
+    "roll_damping_ratio": 0.2,
+    "pitch_damping_ratio": 0.3,
+    "yaw_time_constant_s": 20
+  },
+  "generate_lid": true,
+  "water_density_kg_m3": 1025.0,
+  "gravity_m_s2": 9.81,
+  "omega_rad_s": [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 0.9, 1.2, 1.4, 1.6, 1.8, 2.0, 2.3, 2.6, 2.8, 2.9, 
+    3, 3.1, 3.2, 3.5, 4, 4.5],
+  "wave_directions_deg": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180],
+  "output_dir": "results"
+}
