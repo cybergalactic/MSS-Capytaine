@@ -10,13 +10,13 @@
   "R44_m": 2.4194,
   "R55_m": 5.8156,
   "R66_m": 6.2470,
-  "total_damping": {
-    "surge_time_constant_s": 10,
-    "sway_time_constant_s": 50,
-    "heave_damping_ratio": 0.2,
-    "roll_damping_ratio": 0.2,
-    "pitch_damping_ratio": 0.3,
-    "yaw_time_constant_s": 20
+  "viscous_damping": {
+    "surge_viscous_time_constant_s": 10,
+    "sway_viscous_time_constant_s": 50,
+    "heave_additional_damping_ratio": 0,
+    "roll_additional_damping_ratio": 0.2,
+    "pitch_additional_damping_ratio": 0.1,
+    "yaw_viscous_time_constant_s": 20
   },
   "generate_lid": true,
   "water_density_kg_m3": 1025.0,

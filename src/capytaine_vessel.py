@@ -553,7 +553,7 @@ def write_vessel(
         ),
 
         "viscous_damping_model": (
-            "constant diagonal Bv calibrated at zero/natural frequencies"
+            "constant diagonal Bv added to radiation damping"
             if np.any(np.diag(viscous_damping_matrix) > 0)
             else "none; Bv is zero"
         ),

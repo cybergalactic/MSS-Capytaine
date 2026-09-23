@@ -74,9 +74,10 @@ def run(config_path: Path) -> Path:
     config_path = config_path.resolve()
     with config_path.open(encoding="utf-8") as stream:
         config = json.load(stream)
-    if "viscous_damping" in config:
+    if "total_damping" in config:
         raise ValueError(
-            "Rename viscous_damping to total_damping in the JSON configuration"
+            "Rename total_damping to viscous_damping and review the values: "
+            "the new settings specify additional damping, not total targets"
         )
     base = config_path.parent
 
@@ -400,15 +401,11 @@ def run(config_path: Path) -> Path:
     from .viscous_damping import diagonal_viscous_damping
 
     viscous_damping = diagonal_viscous_damping(
-        config.get("total_damping"),
+        config.get("viscous_damping"),
         omega,
         np.asarray(output_dataset.inertia_matrix.values, dtype=float),
         A0,
-        B0,
         np.asarray(output_dataset.added_mass.transpose(
-            "omega", "influenced_dof", "radiating_dof"
-        ).values, dtype=float),
-        np.asarray(output_dataset.radiation_damping.transpose(
             "omega", "influenced_dof", "radiating_dof"
         ).values, dtype=float),
         np.asarray(output_dataset.hydrostatic_stiffness.values, dtype=float),

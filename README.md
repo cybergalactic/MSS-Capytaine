@@ -52,34 +52,41 @@ mesh-resolution warnings at the highest wave frequencies.
 
 ## Viscous damping
 
-The `total_damping` object specifies reference-frequency targets for the combined damping
-`D(ω) = B(ω) + Bv`, with one named value per DOF: time constants in seconds
-for surge, sway, and yaw, and dimensionless damping ratios for heave, roll,
-and pitch. The test-ship values are:
+The `viscous_damping` object specifies damping added to the potential-flow
+radiation damping `B(ω)`. Its six nonnegative entries are viscous time
+constants in seconds for surge, sway, and yaw, and additional dimensionless
+damping ratios for heave, roll, and pitch. Surge, sway, and yaw have no
+hydrostatic restoring; their time constants specify the intended diagonal
+viscous damping, including yaw. A zero in any entry disables added damping
+for that DOF. The test ship retains its surge/sway/yaw time constants while
+defaulting to no added heave/roll/pitch damping:
 
 ```json
-"total_damping": {
-  "surge_time_constant_s": 10,
-  "sway_time_constant_s": 50,
-  "heave_damping_ratio": 0.2,
-  "roll_damping_ratio": 0.2,
-  "pitch_damping_ratio": 0.3,
-  "yaw_time_constant_s": 20
+"viscous_damping": {
+  "surge_viscous_time_constant_s": 10,
+  "sway_viscous_time_constant_s": 50,
+  "heave_additional_damping_ratio": 0,
+  "roll_additional_damping_ratio": 0,
+  "pitch_additional_damping_ratio": 0,
+  "yaw_viscous_time_constant_s": 20
 }
 ```
 
 The exported `Bv` is diagonal at the center of gravity and constant across
-all coefficient frequencies. Surge, sway, and yaw set the target total
-damping to `(MRBii + Aii(0)) / Ti`, assuming `Bii(0) = 0`. For heave, roll,
-and pitch, the target is `2 ζi ωn (MRBii + Aii(ωn))` at an estimated natural
-frequency from `MRB + A(ω)` and `C`. The program subtracts interpolated
-`Bii(ωn)` to obtain `Bvii`. If potential damping already exceeds the target,
-that `Bv` entry is set to zero with a warning. If a natural frequency lies beyond
-the finite calculation grid, extend `omega_rad_s` rather than extrapolating.
+all coefficient frequencies. For a nonzero time constant `Ti` in surge,
+sway, or yaw, `Bvii = (MRBii + Aii(0)) / Ti`. For heave, roll, and pitch,
+`Bvii = 2 ζv,i ωn,i (MRBii + Aii(ωn,i))`, where `ζv,i` is the
+**additional** ratio and `ωn,i` is the estimated undamped natural frequency
+from `MRB + A(ω)` and `C`. Nothing is subtracted from `B(ω)`.
+A smaller nonzero time constant means more viscous damping. If a required
+natural frequency lies beyond the finite calculation grid, extend
+`omega_rad_s` rather than extrapolating.
 
 The motion RAOs include `B(ω) + Bv`; force RAOs are unchanged. The total
-damping remains frequency-dependent because `B(ω)` varies. Set
-`total_damping` to `null` to export zero `Bv`.
+damping remains frequency-dependent because `B(ω)` varies. Set all six
+entries to zero, or `viscous_damping` to `null`, to export zero `Bv`.
+The old `total_damping` settings are rejected: their values must be
+reconsidered before using the additive model.
 
 ## Outputs
 

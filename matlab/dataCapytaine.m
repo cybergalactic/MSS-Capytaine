@@ -8,11 +8,11 @@ vessel = computeManeuveringModel(vessel,omega_p,0);
 
 % vesselPeriods expects frequency-indexed A/B and one 6-by-6 C matrix.
 Aw = vessel.A(:,:,:,1);
-Bw = vessel.B(:,:,:,1);
+Bw = vessel.B(:,:,:,1) + vessel.Bv(:,:,:,1);
 C = vessel.C(:,:,1,1);
 
 [T,zeta,omega,omega_n] = vesselPeriods( ...
-    vessel.freqs, vessel.MRB, Aw,Bw, C, 'coupled', true);
+    vessel.freqs, vessel.MRB, Aw, Bw, C, 'coupled', true);
 
 figure(gcf)
 patch('Vertices', vertices, ...
