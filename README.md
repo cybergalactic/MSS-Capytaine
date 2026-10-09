@@ -4,7 +4,7 @@
 
 MSS-Capytaine is a Python add-on for the [Marine Systems Simulator (MSS)](https://github.com/cybergalactic/MSS). It uses the open-source [Capytaine](https://capytaine.org/) boundary-element solver to compute 6-DOF linear potential-flow hydrodynamics and exports the results as the standard MATLAB/Octave `vessel` structure used by MSS.
 
-The project provides an open-source hydrodynamic-data workflow for MSS users without access to the commercial ShipX or WAMIT solvers. Capytaine performs the boundary-element calculations; MSS provides the MATLAB and GNU Octave functions for analysis, model reduction, plotting, and time-domain simulation. 
+The project provides an open-source hydrodynamic-data workflow for MSS users without access to the commercial ShipX or WAMIT solvers. Capytaine performs the boundary-element calculations; MSS provides the MATLAB and GNU Octave functions for analysis, model reduction, nonlinear model refinement, plotting, and time-domain simulation.
 
 The repository includes a synthetic surface monohull and an idealized submerged case named `LAUV_marie`. LAUV stands for Light Autonomous Underwater Vehicle; OceanScan commercializes the platform family, and Marie is NTNU AUR-Lab's vehicle. The cases demonstrate the complete Capytaine-to-MSS workflow rather than representing validated vessel designs.
 
@@ -41,7 +41,7 @@ vessels_capytaine/
 
 1. **Create the vessel catalogue and offset CSV with AI assistance.** Under `vessels_capytaine/`, create a folder named after the vessel, for example `vessels_capytaine/myVessel/`. Use a simple folder name without spaces because the same name will be entered on the command line. Copy the existing [`offset_points.csv`](vessels_capytaine/testShip/offset_points.csv) into the new folder and use it as the required template. Upload the template, along with the vessel datasheet, drawings, and relevant photographs, to an AI assistant such as ChatGPT, and ask it to produce a new CSV with the same columns and coordinate convention. Save the result as `offset_points.csv`. AI-generated geometry is a starting point and must be checked by the user.
 2. **Enter the vessel particulars in JSON.** Copy the existing [`config.json`](vessels_capytaine/testShip/config.json) into the same folder. Set `body_name` to `myVessel`, `output_filename` to `myVessel.mat`, `offset_points_csv` to `offset_points.csv`, and `output_dir` to `results`. Update the principal dimensions, mass properties, center of mass, mesh resolution, frequency range, and damping inputs, then save the file as `config.json`.
-3. **Run MSS-Capytaine.** From the repository root, type `python main.py myVessel`. This single command automatically generates the mesh, runs the Capytaine BEM calculations, converts the results to MSS forward-starboard-down (FSD) coordinates, and exports the MSS `vessel` structure to a MATLAB/Octave MAT-file.
+3. **Run MSS-Capytaine and check its accuracy warnings.** From the repository root, type `python main.py myVessel`. This single command automatically generates the mesh, runs the Capytaine BEM calculations, converts the results to MSS forward-starboard-down (FSD) coordinates, and exports the MSS `vessel` structure to a MATLAB/Octave MAT-file. Before symmetrizing the hydrodynamic matrices, the program checks the reciprocal coupling terms in the added-mass matrix `A` and the potential damping matrix `B`. A reciprocity warning can indicate that the mesh is too sparse for the selected frequency range. Increase `samples_per_section` or `number_of_stations` in `config.json`, rerun the calculation, and repeat until the warning is resolved or otherwise understood.
 4. **Inspect the generated mesh.** In MATLAB or Octave, add MSS and the MSS-Capytaine MATLAB folder to the path, then call `plotVesselMesh('myVessel')`. The function finds and loads the generated `.mat` and mesh files automatically.
 
    ```matlab
@@ -50,7 +50,7 @@ vessels_capytaine/
    plotVesselMesh('myVessel')
    ```
 
-   Check the hull shape, waterline, station spacing, panel resolution, and any Capytaine warnings. If the mesh is satisfactory, continue to item 5. If it is not satisfactory, return to item 1, revise the offset CSV or source information, and run the calculation again.
+   Check the hull shape, waterline, station spacing, panel resolution, and any Capytaine warnings. If the mesh is satisfactory, continue to the hydrodynamic-results inspection. If it is not satisfactory, return to the start of the workflow, revise the offset CSV or source information, and run the calculation again.
 5. **Inspect the hydrodynamic results.** Use the same catalog name to plot the force RAOs, added mass, radiation damping, and viscous damping. This function also finds and loads the generated vessel file automatically:
 
    ```matlab
@@ -58,12 +58,17 @@ vessels_capytaine/
    ```
 
 6. **Copy the MSS vessel file.** Copy the generated `vessels_capytaine/myVessel/results/myVessel.mat` file to a matching vessel directory under `MSS/HYDRO/vessels_capytaine/`.
-7. **Simulate the vessel in MSS.** In MATLAB or GNU Octave, run [`SIMhydroVessel.m`](https://github.com/cybergalactic/MSS/blob/master/CRAFT/SIMhydroVessel.m) to use the 6-DOF model with waves and visualize the simulation.
+7. **Simulate the generated model in MSS.** In MATLAB or GNU Octave, run [`SIMhydroVessel.m`](https://github.com/cybergalactic/MSS/blob/master/CRAFT/SIMhydroVessel.m) to exercise the generated 6-DOF model with waves and visualize the baseline response.
+8. **Optionally refine and validate the model in MSS.** Treat the exported Capytaine model as a linear potential-flow baseline. Use experimental tests or measured time series to identify and calibrate the viscous damping matrix. Augment the model with the velocity-dependent rigid-body and added-mass Coriolis–centripetal matrices and the applicable nonlinear loads: ITTC quadratic surge drag, cross-flow drag, and quadratic roll, pitch, and yaw damping. When required, include force and moment models for actuators such as control surfaces, thrusters, and propellers. Compare simulated and measured responses and iterate until the model is adequate for its intended use.
 
 The data flow is:
 
 ```text
 Datasheets + drawings + photographs + CSV template
+                         |
+                         v
+          AI-assisted geometry processing
+       Generate offset data; review and verify
                          |
                          v
         vessels_capytaine/myVessel/
@@ -74,14 +79,24 @@ Datasheets + drawings + photographs + CSV template
              python main.py myVessel
                          |
                          v
+       Added mass (A) or potential damping (B)
+                 reciprocity warning?
+          |-- yes --> Refine mesh settings in config.json
+          `-- no
+               |
+               v
+  ------------- Python -> MATLAB/GNU Octave -------------
+               |
+               v
           plotVesselMesh('myVessel')
-                         |
-                  Is the mesh OK?
-                    /          \
-                  no            yes
-                  |              |
-                  v              v
-       Return to item 1    plotVesselHydrodynamics('myVessel')
+               |
+               v
+          Is the mesh visually acceptable?
+          |-- no --> Return to top; revise inputs
+          `-- yes
+               |
+               v
+          plotVesselHydrodynamics('myVessel')
                                  |
                                  v
                     Copy results/myVessel.mat to MSS
@@ -90,8 +105,32 @@ Datasheets + drawings + photographs + CSV template
           Run SIMhydroVessel.m in MSS
                          |
                          v
-        6-DOF simulation with waves
+         Baseline 6-DOF simulation with waves
+                         |
+                         v
+       Optional: refine the linear model in MSS
+         |-- calibrate viscous damping from
+         |   experimental tests or time series
+         |-- add velocity-dependent Coriolis-
+         |   centripetal terms and nonlinear drag
+         `-- optionally add actuator force/moment
+             models for control surfaces and propulsors
+                         |
+                  Validate against data
+                         |
+                         v
+        Iterate calibration and validation
+          until the model is fit for purpose
+                         |
+                         v
+           Validated nonlinear MSS model
 ```
+
+### MSS model refinement and validation
+
+The exported mass, added-mass, radiation-damping, restoring, and wave-excitation data define a linear model about the selected equilibrium condition. They are not, by themselves, a validated nonlinear maneuvering model. Experimental data can come from model-basin tests, free-decay tests, captive tests, or full-scale trials; recorded input-output time series can also be used for parameter estimation. The calibration data should cover the operating conditions in which the model will be used.
+
+MSS [`hydroVessel.m`](https://github.com/cybergalactic/MSS/blob/master/CRAFT/hydroVessel.m) shows how to extend this baseline with the velocity-dependent rigid-body and added-mass Coriolis–centripetal matrices, ITTC-1957 quadratic surge resistance, strip-theory cross-flow drag, and quadratic roll, pitch, and yaw damping. The supporting MSS functions include `rbody`, `m2c`, `XuuITTC`, and `crossFlowDrag`. Application models can additionally represent the forces and moments produced by control surfaces, thrusters, and propellers, together with relevant actuator dynamics and limits. These nonlinear terms and their coefficients are modeling assumptions; calibrate them against measurements and validate the complete model on data that were not used for calibration.
 
 MSS-Capytaine converts the Capytaine results to the MSS conventions before export:
 
@@ -109,7 +148,7 @@ The exported `vessel` structure contains:
 | `main` | Vessel particulars, mass properties, centers, and metacentric heights |
 | `MRB` | Rigid-body mass matrix |
 | `A` | Zero-, finite-, and infinite-frequency added mass |
-| `B` | Potential-flow radiation damping |
+| `B` | Potential damping |
 | `C` | Hydrostatic restoring matrix |
 | `forceRAO` | First-order wave-excitation force RAOs |
 | `motionRAO` | First-order motion RAOs computed with potential damping `B` |
@@ -245,7 +284,7 @@ Set `submerged` to `false` for a surface vessel. The solver then generates an in
 
 A submerged case also requires `submergence_depth_m`, the mean operating depth of the body-fixed origin used as the fixed equilibrium position for the free-surface solve. It is not an average of hydrodynamic coefficients over a depth range. This translation affects the added mass, radiation damping, and RAOs but is removed from the exported MSS CG, CB, and panel coordinates. For submerged bodies, `vessel.main.T` is the body height rather than a surface-vessel draft. Use `output_filename` to give each catalog case its own `.mat` filename.
 
-`samples_per_section` controls resolution around each half section, while `number_of_stations` controls resolution along the hull. Check Capytaine's mesh-resolution warnings at the highest wave frequencies. The workflow symmetrizes the added-mass and radiation-damping matrices as required by zero-speed reciprocity. It reports a warning when the local reciprocity error exceeds 1%, and the skew also exceeds 0.1% of the largest matrix norm over the solved frequency range. This avoids misleading ratios where submerged-body radiation damping is numerically close to zero.
+`samples_per_section` controls resolution around each half section, while `number_of_stations` controls resolution along the hull. Check Capytaine's mesh-resolution warnings at the highest wave frequencies. The workflow checks the reciprocal `A_ij`/`A_ji` and `B_ij`/`B_ji` coupling terms before symmetrizing the added-mass and radiation-damping matrices as required at zero speed. It reports a warning when the local reciprocity error exceeds 1%, and the skew also exceeds 0.1% of the largest matrix norm over the solved frequency range. This avoids misleading ratios where submerged-body radiation damping is numerically close to zero. If a warning is reported, refine the mesh and rerun the calculation before accepting the exported model.
 
 ## Viscous damping correction
 
