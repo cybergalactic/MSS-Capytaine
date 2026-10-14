@@ -17,11 +17,37 @@ ellipsoidal tapers. Fins, antennas, sonar heads, and the propeller are omitted.
 The transverse radius of gyration is based on a uniform cylinder, and the
 center of gravity is assumed to be 0.01 m below the center of buoyancy.
 
-The body-fixed offset geometry is centered on the origin. For the Capytaine
-free-surface calculation it is placed at a mean operating center depth of
-5.0 m. This is a single fixed equilibrium depth, not a depth-averaged
-hydrodynamic model. The translation is not included in the MSS body-fixed CG,
-CB, or panel coordinates.
+The body-fixed offset geometry is centered on the origin. The recommended
+Capytaine reference position for this example is a center depth of 1.0 m.
+The 0.15 m diameter hull is then fully submerged, with its upper surface about
+0.925 m below the free surface. This relatively shallow reference is useful
+when one generated model will be reused over a larger operating-depth range:
+MSS can attenuate its wave-excitation force for deeper operation without
+having to amplify a model generated at 5 m.
+
+`submergence_depth_m` always defines one fixed equilibrium depth, not a
+depth-averaged hydrodynamic model. Setting it to another value makes
+MSS-Capytaine recompute the added mass, radiation damping, and RAOs at that
+depth. Values between 1 m and 20 m therefore represent progressively deeper
+models with weaker wave excitation and less free-surface influence. A value
+such as 100 m is also accepted, but most first-order excitation from ordinary
+wave frequencies will be extremely small; very long, low-frequency waves
+penetrate more deeply.
+
+When this 1 m model is used by the MSS depth-attenuation model, the generated
+force RAOs are unchanged for `d <= 1 m`. For `d > 1 m`, each frequency
+component is multiplied by
+
+```text
+exp[-(omega^2/g) (d - 1 m)].
+```
+
+This is a one-sided approximation: wave loads are never amplified above the
+reference position. It changes the wave-excitation force only and does not
+recompute added mass or radiation damping as the vehicle changes depth. Users
+operating mainly at another depth can generate a dedicated Capytaine model at
+that representative depth instead. The equilibrium translation is not
+included in the MSS body-fixed CG, CB, or panel coordinates.
 
 The finite-frequency grid runs from 0.1 to 9.5 rad/s. It resolves the
 low-frequency free-surface interaction and becomes coarser at higher
