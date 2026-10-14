@@ -14,7 +14,7 @@
     "delta_zeta_45": [0.2, 0.2]
   },
   "submerged": true,
-  "submergence_depth_m": 5.0,
+  "submergence_depth_m": 1.0,
   "water_density_kg_m3": 1025.0,
   "gravity_m_s2": 9.81,
   "omega_rad_s": [
