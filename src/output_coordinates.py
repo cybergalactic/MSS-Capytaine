@@ -1,4 +1,4 @@
-"""Convert offset-mesh Capytaine results to MSS forward-starboard-down at CG."""
+"""Internal transforms between solver axes and the public MSS FSD convention."""
 
 import numpy as np
 import xarray as xr
@@ -6,6 +6,16 @@ import xarray as xr
 
 DOF_SIGNS = np.array([-1.0, 1.0, -1.0, -1.0, 1.0, -1.0])
 POSITION_SIGNS = np.array([-1.0, 1.0, -1.0])
+
+
+def transform_positions(values: np.ndarray) -> np.ndarray:
+    """Rotate positions in either direction (the transform is its own inverse)."""
+    return np.asarray(values, dtype=float) * POSITION_SIGNS
+
+
+def transform_matrix(values: np.ndarray) -> np.ndarray:
+    """Rotate a generalized 6x6 matrix in either direction at the same origin."""
+    return DOF_SIGNS[:, None] * np.asarray(values, dtype=float) * DOF_SIGNS[None, :]
 
 
 def to_mss_fsd(dataset: xr.Dataset) -> xr.Dataset:
@@ -42,6 +52,6 @@ def to_mss_fsd(dataset: xr.Dataset) -> xr.Dataset:
         "matrix_reference": "CG", "force_reference": "CG",
         "motion_reference": "CG",
         "wave_direction_definition": "propagation angle from FSD +x toward +y",
-        "source_frame": "Capytaine offset mesh: x aft, y starboard, z up",
+        "source_frame": "internal solver frame",
     })
     return converted

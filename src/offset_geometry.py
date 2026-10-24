@@ -13,9 +13,10 @@ def read_offset_sections(
     *,
     submerged: bool = False,
 ) -> list[tuple[float, np.ndarray]]:
-    """Read x, z, half breadth in mesh axes: x aft and z up.
+    """Read MSS FSD offsets, converting to internal x-aft, z-up sections.
 
-    Rows within a station run from bottom to top. Surface-vessel sections end
+    Input x points forward and z down. Rows run bottom to top (decreasing z).
+    Surface-vessel sections end
     at the design waterline (z=0). Submerged sections are closed profiles with
     zero half breadth at both the bottom and top. Repeated z values are allowed
     so a flat bottom can be represented without losing its corners.
@@ -45,14 +46,14 @@ def read_offset_sections(
             if (
                 not np.all(np.isfinite((x, z, half_breadth)))
                 or half_breadth < 0
-                or (not submerged and z > 1e-9)
+                or (not submerged and z < -1e-9)
             ):
                 raise ValueError(
                     f"Line {line} requires finite x and z, "
-                    "half breadth>=0, and z<=0 for a surface vessel"
+                    "half breadth>=0, and FSD z>=0 for a surface vessel"
                 )
 
-            sections.setdefault(x, []).append((half_breadth, z))
+            sections.setdefault(-x, []).append((half_breadth, -z))
 
     if len(sections) < 3:
         raise ValueError(
@@ -69,7 +70,7 @@ def read_offset_sections(
             or np.any(np.diff(profile[:, 1]) < -1e-9)
         ):
             raise ValueError(
-                f"Station x={x} must contain bottom-to-top ordered points"
+                f"Station x={-x} must contain bottom-to-top ordered points (decreasing FSD z)"
             )
 
         if submerged:
@@ -78,7 +79,7 @@ def read_offset_sections(
                 or not np.isclose(profile[-1, 0], 0.0, atol=1e-9)
             ):
                 raise ValueError(
-                    f"Submerged station x={x} must run bottom-to-top "
+                    f"Submerged station x={-x} must run bottom-to-top "
                     "and end on the centerline"
                 )
         elif (
@@ -86,19 +87,19 @@ def read_offset_sections(
             or not np.isclose(profile[-1, 1], 0.0, atol=1e-9)
         ):
             raise ValueError(
-                f"Station x={x} must start below and end at the waterline"
+                f"Station x={-x} must start below and end at the waterline"
             )
 
         if not np.isclose(profile[0, 0], 0.0, atol=1e-9):
             raise ValueError(
-                f"Station x={x} must start at the centerline keel"
+                f"Station x={-x} must start at the centerline keel"
             )
 
         if np.any(
             np.linalg.norm(np.diff(profile, axis=0), axis=1) <= 1e-10
         ):
             raise ValueError(
-                f"Station x={x} has duplicate consecutive points"
+                f"Station x={-x} has duplicate consecutive points"
             )
 
         ordered.append((x, profile))
@@ -296,6 +297,17 @@ def panels_from_sections(
     # Close bow and stern
     # ---------------------------------------------------------------
 
+    # A transom strip can span the entire beam. Subdivide it in both
+    # directions to match the surrounding hull resolution, including
+    # triangular strips whose lower width collapses to the centerline.
+    cap_spacing = max(
+        float(np.median(np.diff(xs))),
+        float(np.median(np.linalg.norm(np.diff(profiles, axis=1), axis=2))),
+    )
+
+    def between(a, b, fraction):
+        return tuple((1-fraction)*np.asarray(a) + fraction*np.asarray(b))
+
     for i, end in (
         (0, -1),
         (len(xs) - 1, 1),
@@ -326,20 +338,21 @@ def panels_from_sections(
                 profiles[i][j + 1, 1],
             )
 
-            if end == -1:
-                quadrangle(
-                    low_port,
-                    high_port,
-                    high_starboard,
-                    low_starboard,
-                )
-            else:
-                quadrangle(
-                    low_port,
-                    low_starboard,
-                    high_starboard,
-                    high_port,
-                )
+            width = max(2*profiles[i][j, 0], 2*profiles[i][j+1, 0])
+            side_length = np.linalg.norm(np.subtract(high_port, low_port))
+            columns = max(1, int(np.ceil(width / cap_spacing)))
+            rows = max(1, int(np.ceil(side_length / cap_spacing)))
+            for row in range(rows):
+                left0 = between(low_port, high_port, row/rows)
+                right0 = between(low_starboard, high_starboard, row/rows)
+                left1 = between(low_port, high_port, (row+1)/rows)
+                right1 = between(low_starboard, high_starboard, (row+1)/rows)
+                for column in range(columns):
+                    a = between(left0, right0, column/columns)
+                    b = between(left1, right1, column/columns)
+                    c = between(left1, right1, (column+1)/columns)
+                    d = between(left0, right0, (column+1)/columns)
+                    quadrangle(a, b, c, d) if end == -1 else quadrangle(a, d, c, b)
 
     if not faces:
         raise ValueError(

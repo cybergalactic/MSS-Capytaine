@@ -6,125 +6,43 @@ MSS-Capytaine is a Python add-on for the [Marine Systems Simulator (MSS)](https:
 
 The project provides an open-source hydrodynamic-data workflow for MSS users without access to the commercial ShipX or WAMIT solvers. Capytaine performs the boundary-element calculations; MSS provides the MATLAB and GNU Octave functions for analysis, model reduction, nonlinear model refinement, plotting, and time-domain simulation.
 
-The repository includes a synthetic surface monohull and an idealized submerged case named `LAUV_marie`. LAUV stands for Light Autonomous Underwater Vehicle; OceanScan commercializes the platform family, and Marie is NTNU AUR-Lab's vehicle. The cases demonstrate the complete Capytaine-to-MSS workflow rather than representing validated vessel designs.
+![MATLAB previews of testShip and LAUV Marie: CSV offset sections above their saved Capytaine hull meshes, shown in MSS FSD coordinates.](docs/images/vessel-geometry.png)
+
+Geometry previews from `plotVesselGeometry`: the synthetic surface vessel **testShip** and idealized submerged vehicle **LAUV Marie**. Source offset sections are shown above the saved meshes; red crosses mark the CG. Each column has matching axes for comparison. These are example geometries, not measured hull reconstructions.
+
+**Validation highlight:** For the supplied tanker, Capytaine agrees closely with the WAMIT reference: relative norm differences are **below 0.7% for diagonal added mass, 1.8% for diagonal radiation damping, and 0.7% for complex excitation forces**, over 0.0424–1.8003 rad/s. This is a strong numerical check of the Capytaine-to-MSS workflow. See the [results and interpretation](#tanker-comparison-with-wamit) and the [Python comparison test](tests/compare_tanker_wamit.py).
+
+Supply your own hull geometry through any of four input formats:
+
+| Catalogue group | Geometry input | What MSS-Capytaine does |
+| --- | --- | --- |
+| **`capytaine_offsets_csv` — default** | Your own CSV hull-section points | Generates panels using free, open-source software. No commercial software or licence is required. |
+| `mesh_stl` | An existing STL triangle mesh in metres and MSS FSD | Reads the panels directly; accepts ASCII and binary STL. |
+| `shipx_mgf` | ShipX/VERES MGF hull sections | Clips to the selected draft and generates panels. |
+| `wamit_gdf` | WAMIT Geometric Data File containing a hull panel mesh | Loads the panels with Capytaine's native GDF reader, including symmetry. |
+
+MGF, GDF and STL supply geometry, not precomputed added mass, damping or wave-force results. Capytaine computes these results without requiring a commercial ShipX or WAMIT solver.
+
+The [catalogue](vessels_capytaine/README.md) includes CSV examples [testShip](vessels_capytaine/capytaine_offsets_csv/testShip/), [LAUV_marie](vessels_capytaine/capytaine_offsets_csv/LAUV_marie/), and approximate Otter twin-hull cases at [55 kg](vessels_capytaine/capytaine_offsets_csv/otter_55kg/) and [80 kg](vessels_capytaine/capytaine_offsets_csv/otter_80kg/), the public [Wigley STL](vessels_capytaine/mesh_stl/wigley/), the ShipX [supply vessel](vessels_capytaine/shipx_mgf/supply/), and the WAMIT [tanker](vessels_capytaine/wamit_gdf/tanker/). These demonstrate the workflow; geometry, physical properties and numerical convergence still require validation.
 
 Author: Thor I. Fossen
 
-## Recommended citation
+## Guides for new users
 
-If you use MSS-Capytaine in your work, please cite the software as:
-
-> Fossen, Thor I. (2026). *MSS-Capytaine* (Version 1.0) [Computer software]. GitHub. https://github.com/cybergalactic/MSS-Capytaine
-
-BibTeX:
-
-```bibtex
-@software{Fossen2026_MSScapytaine,
-  author  = {Fossen, Thor I.},
-  title   = {MSS-Capytaine},
-  version = {1.0},
-  year    = {2026},
-  url     = {https://github.com/cybergalactic/MSS-Capytaine}
-}
-```
+- [How to configure a JSON file](How%20to%20configure%20the%20vessel%20JSON%20file.md): create a case, choose CSV, MGF, GDF or STL geometry, enter mass and CG in MSS FSD, and configure frequencies, mesh resolution, and damping.
+- [How to generate offset points using AI](How%20to%20generate%20offsets%20points%20using%20AI.md): prepare source material, use a copyable prompt, and check the resulting CSV.
 
 ## MSS Toolbox Integration
 
-The version 1.0 workflow uses a named vessel folder containing an offset CSV file for the hull geometry and a JSON file for the vessel particulars and calculation settings. The folder name is also the vessel name used in the Python command. For example, a vessel named `myVessel` must have this catalog structure:
+Each vessel has a folder `vessels_capytaine/<format>/<vessel>/` containing `config.json`, its geometry, a README and results after solving. The parent group identifies the input route and the vessel name stays simple. JSON centers, CSV points, STL vertices, full inertia matrices, exported panels and plots use **MSS FSD: x forward, y starboard, z down**. MGF/GDF files retain their standard conventions; Python handles conversion internally.
 
-```text
-vessels_capytaine/
-  myVessel/
-    config.json
-    offset_points.csv
-```
+1. Create a case using the [JSON guide](How%20to%20configure%20the%20vessel%20JSON%20file.md). If needed, generate the hull CSV using the [AI offset guide](How%20to%20generate%20offsets%20points%20using%20AI.md).
+2. Run `python main.py capytaine_offsets_csv/myVessel`. Inspect accuracy warnings and check mesh convergence; refine CSV/MGF sampling or the source GDF/STL mesh as needed.
+3. Inspect the mesh and hydrodynamics with `plotVesselGeometry('myVessel')` and `plotVesselHydrodynamics('myVessel')` in MATLAB or GNU Octave.
+4. Copy `vessels_capytaine/<format>/myVessel/results/myVessel.mat` to `MSS/HYDRO/vessels_capytaine/myVessel/`.
+5. Run MSS [SIMhydroVessel.m](https://github.com/cybergalactic/MSS/blob/master/CRAFT/SIMhydroVessel.m) to simulate the baseline model, then calibrate and validate it for the intended use.
 
-1. **Create the vessel catalogue and offset CSV with AI assistance.** Under `vessels_capytaine/`, create a folder named after the vessel, for example `vessels_capytaine/myVessel/`. Use a simple folder name without spaces because the same name will be entered on the command line. Copy the existing [`offset_points.csv`](vessels_capytaine/testShip/offset_points.csv) into the new folder and use it as the required template. Upload the template, along with the vessel datasheet, drawings, and relevant photographs, to an AI assistant such as ChatGPT, and ask it to produce a new CSV with the same columns and coordinate convention. Save the result as `offset_points.csv`. AI-generated geometry is a starting point and must be checked by the user.
-2. **Enter the vessel particulars in JSON.** Copy the existing [`config.json`](vessels_capytaine/testShip/config.json) into the same folder. Set `body_name` to `myVessel`, `output_filename` to `myVessel.mat`, `offset_points_csv` to `offset_points.csv`, and `output_dir` to `results`. Update the principal dimensions, mass properties, center of mass, mesh resolution, frequency range, and damping inputs, then save the file as `config.json`.
-3. **Run MSS-Capytaine and check its accuracy warnings.** From the repository root, type `python main.py myVessel`. This single command automatically generates the mesh, runs the Capytaine BEM calculations, converts the results to MSS forward-starboard-down (FSD) coordinates, and exports the MSS `vessel` structure to a MATLAB/Octave MAT-file. Before symmetrizing the hydrodynamic matrices, the program checks the reciprocal coupling terms in the added-mass matrix `A` and the potential damping matrix `B`. A reciprocity warning can indicate that the mesh is too sparse for the selected frequency range. Increase `samples_per_section` or `number_of_stations` in `config.json`, rerun the calculation, and repeat until the warning is resolved or otherwise understood.
-4. **Inspect the generated mesh.** In MATLAB or Octave, add MSS and the MSS-Capytaine MATLAB folder to the path, then call `plotVesselMesh('myVessel')`. The function finds and loads the generated `.mat` and mesh files automatically.
-
-   ```matlab
-   addpath(genpath('/path/to/MSS'))
-   addpath('/path/to/MSS-Capytaine/matlab')
-   plotVesselMesh('myVessel')
-   ```
-
-   Check the hull shape, waterline, station spacing, panel resolution, and any Capytaine warnings. If the mesh is satisfactory, continue to the hydrodynamic-results inspection. If it is not satisfactory, return to the start of the workflow, revise the offset CSV or source information, and run the calculation again.
-5. **Inspect the hydrodynamic results.** Use the same catalog name to plot the force RAOs, added mass, radiation damping, and viscous damping. This function also finds and loads the generated vessel file automatically:
-
-   ```matlab
-   plotVesselHydrodynamics('myVessel');
-   ```
-
-6. **Copy the MSS vessel file.** Copy the generated `vessels_capytaine/myVessel/results/myVessel.mat` file to a matching vessel directory under `MSS/HYDRO/vessels_capytaine/`.
-7. **Simulate the generated model in MSS.** In MATLAB or GNU Octave, run [`SIMhydroVessel.m`](https://github.com/cybergalactic/MSS/blob/master/CRAFT/SIMhydroVessel.m) to exercise the generated 6-DOF model with waves and visualize the baseline response.
-8. **Optionally refine and validate the model in MSS.** Treat the exported Capytaine model as a linear potential-flow baseline. Use experimental tests or measured time series to identify and calibrate the viscous damping matrix. Augment the model with the velocity-dependent rigid-body and added-mass Coriolis–centripetal matrices and the applicable nonlinear loads: ITTC quadratic surge drag, cross-flow drag, and quadratic roll, pitch, and yaw damping. When required, include force and moment models for actuators such as control surfaces, thrusters, and propellers. Compare simulated and measured responses and iterate until the model is adequate for its intended use.
-
-The data flow is:
-
-```text
-Datasheets + drawings + photographs + CSV template
-                         |
-                         v
-          AI-assisted geometry processing
-       Generate offset data; review and verify
-                         |
-                         v
-        vessels_capytaine/myVessel/
-          |-- offset_points.csv
-          `-- config.json
-                         |
-                         v
-             python main.py myVessel
-                         |
-                         v
-       Added mass (A) or potential damping (B)
-                 reciprocity warning?
-          |-- yes --> Refine mesh settings in config.json
-          `-- no
-               |
-               v
-  ------------- Python -> MATLAB/GNU Octave -------------
-               |
-               v
-          plotVesselMesh('myVessel')
-               |
-               v
-          Is the mesh visually acceptable?
-          |-- no --> Return to top; revise inputs
-          `-- yes
-               |
-               v
-          plotVesselHydrodynamics('myVessel')
-                                 |
-                                 v
-                    Copy results/myVessel.mat to MSS
-                         |
-                         v
-          Run SIMhydroVessel.m in MSS
-                         |
-                         v
-         Baseline 6-DOF simulation with waves
-                         |
-                         v
-       Optional: refine the linear model in MSS
-         |-- calibrate viscous damping from
-         |   experimental tests or time series
-         |-- add velocity-dependent Coriolis-
-         |   centripetal terms and nonlinear drag
-         `-- optionally add actuator force/moment
-             models for control surfaces and propulsors
-                         |
-                  Validate against data
-                         |
-                         v
-        Iterate calibration and validation
-          until the model is fit for purpose
-                         |
-                         v
-           Validated nonlinear MSS model
-```
+The saved hydrodynamic arrays remain compatible with MSS, but the current MSS surface-vessel loader still expects `kappa_126` rather than the new `T_126` damping inputs. Loading a MAT file does not automatically migrate that interface: a preset with its own damping override may continue using percentages, while a case that relies on the saved defaults can reject the new metadata. Adopting `T_126` in MSS requires the corresponding loader and processing update, which is postponed. The local `plotVesselHydrodynamics` helper already supports it; no BEM rerun is needed for this migration.
 
 ### MSS model refinement and validation
 
@@ -178,7 +96,7 @@ source .venv/bin/activate
 python -m pip install capytaine numpy scipy xarray matplotlib
 ```
 
-On Windows, activate the environment with `.venv\Scripts\activate` instead. MSS is not required to run the Python calculation, but it is required for the MATLAB/Octave post-processing workflow.
+On Windows, activate the environment with `.venv\Scripts\activate` instead. MSS is not required for the Python calculation or source-geometry previews. It is required for the MATLAB/Octave hydrodynamic post-processing workflow.
 
 ## Quick start
 
@@ -188,14 +106,19 @@ Run the default surface-vessel calculation from the repository root:
 python main.py
 ```
 
-`main.py` reads `vessels_capytaine/testShip/config.json` and writes the generated files to `vessels_capytaine/testShip/results/`.
+`main.py` reads `vessels_capytaine/capytaine_offsets_csv/testShip/config.json` and writes the generated files to `vessels_capytaine/capytaine_offsets_csv/testShip/results/`.
 
-List or select catalog vehicles by name:
+List or select grouped catalogue cases (unique short names also work):
 
 ```sh
 python main.py --list
-python main.py testShip
-python main.py LAUV_marie
+python main.py capytaine_offsets_csv/testShip
+python main.py capytaine_offsets_csv/LAUV_marie
+python main.py capytaine_offsets_csv/otter_55kg
+python main.py capytaine_offsets_csv/otter_80kg
+python main.py shipx_mgf/supply
+python main.py wamit_gdf/tanker
+python main.py mesh_stl/wigley
 ```
 
 A direct path to another configuration is also accepted:
@@ -210,46 +133,84 @@ Run the submerged LAUV Marie case with:
 python main.py LAUV_marie
 ```
 
-This writes `vessels_capytaine/LAUV_marie/results/LAUV_marie.mat`. The case uses NTNU's published 2.15 m length and 34 kg mass for Marie, the published 0.15 m OceanScan LAUV-family diameter, and a documented idealized tapered-cylinder hull. Its finite-frequency grid extends to 9.5 rad/s; 10 rad/s remains the plotting location for the separately computed infinite-frequency result.
+This writes `vessels_capytaine/capytaine_offsets_csv/LAUV_marie/results/LAUV_marie.mat`. The case uses NTNU's published 2.15 m length and 34 kg mass for Marie, the published 0.15 m OceanScan LAUV-family diameter, and a documented idealized tapered-cylinder hull. Its finite-frequency grid extends to 9.5 rad/s; 10 rad/s remains the plotting location for the separately computed infinite-frequency result.
 
-To inspect either result using MSS, add MSS and the MSS-Capytaine MATLAB directory to the MATLAB or GNU Octave path, then pass the catalogue name to the two vessel-independent plotting functions. Each function automatically locates and loads the generated vessel data.
+To inspect either result, add the MSS-Capytaine MATLAB directory to the MATLAB or GNU Octave path. Add MSS too for hydrodynamic post-processing. The result viewers automatically locate and load the generated vessel data.
 
 For `testShip`:
 
 ```matlab
 addpath(genpath('/path/to/MSS'))
 addpath('/path/to/MSS-Capytaine/matlab')
-plotVesselMesh('testShip')
+plotVesselGeometry('testShip')
 plotVesselHydrodynamics('testShip');
 ```
 
 For `LAUV_marie`:
 
 ```matlab
-plotVesselMesh('LAUV_marie')
+plotVesselGeometry('LAUV_marie')
 plotVesselHydrodynamics('LAUV_marie');
 ```
 
-`plotVesselMesh` loads `myVessel.mat` and the matching generated panel file from the named catalog folder. `plotVesselHydrodynamics` loads the same vessel structure, calls `computeManeuveringModel` using the damping inputs exported from `config.json`, then uses `plotTF`, `plotABC`, and `plotBv` to inspect the MSS hydrodynamic data. It also calls `vesselPeriods` for surface vessels; fully submerged vehicles have no hydrostatic heave stiffness, so that calculation is skipped automatically.
+`plotVesselGeometry` shows source geometry and the saved Capytaine hull mesh in two subplots. It works before solving too, with a message in the mesh subplot until results are available. `plotVesselHydrodynamics` loads the saved vessel structure, uses MSS to compute the equivalent matrices, applies the exported time constants through a private helper, then uses `plotTF`, `plotABC`, and `plotBv` to inspect the hydrodynamic data. It also calls `vesselPeriods` for surface vessels; fully submerged vehicles have no hydrostatic heave stiffness, so that calculation is skipped automatically.
 
 ## Repository layout
 
 ```text
-main.py                         Run the example calculation
-plot_results.py                 Plot the exported result using Python
-src/                            Mesh, solver, coordinate, damping, and export code
+main.py                         Run a case; --list shows group/vessel names
+plot_results.py                 Plot saved MSS results
+src/                            Geometry readers, mesh generation and solver
+tests/                          Checks and numerical comparisons
+  compare_tanker_wamit.py       Compare saved tanker results with MSS WAMIT
+  compare_supply_shipx.py       Compare saved supply results with MSS ShipX
+matlab/                         Two public plotting functions
+  plotVesselGeometry.m          Source geometry and saved Capytaine mesh
+  plotVesselHydrodynamics.m     Saved hydrodynamic results (requires MSS)
+  private/                      Internal source/mesh readers and catalogue lookup
 vessels_capytaine/
-  testShip/config.json          Example configuration
-  testShip/offset_points.csv
-                                Example hull offsets
-  testShip/README.md            Geometry and modeling assumptions
-  testShip/results/             Generated hydrodynamic data
-  LAUV_marie/config.json        Submerged LAUV Marie-inspired configuration
-  LAUV_marie/offset_points.csv  Idealized closed-body offsets
-  LAUV_marie/README.md          Sources and modeling assumptions
-matlab/plotVesselMesh.m         Plot the generated mesh for any catalog vessel
-matlab/plotVesselHydrodynamics.m
-                                Plot MSS hydrodynamic data for any vessel
+  capytaine_offsets_csv/        Default native CSV workflow
+    LAUV_marie/
+    otter_55kg/                 Approximate twin hull, no added payload
+    otter_80kg/                 Same hull, MSS 25 kg payload
+    testShip/
+  mesh_stl/
+    wigley/                     Adapted public STL; source and licence recorded
+  shipx_mgf/
+    supply/                     supply.mgf copied from the MSS ShipX archive
+  wamit_gdf/
+    tanker/                     246 m WAMIT geometry and comparison report
+```
+
+Each vessel directory contains `config.json`, the geometry file and a README. Its `results/` folder holds `<vessel>.mat`, hydrostatics and exported panels. The two root-level guides explain configuration and AI-assisted CSV creation.
+
+
+## Plot geometry and mesh
+
+Geometry uses two rows and one column: source above, saved mesh below, with matching axis limits and linked viewing angles. There are two public MATLAB/Octave plotting functions, both displaying MSS FSD:
+
+| Function | Displays | Needs a completed solve | Needs MSS |
+| --- | --- | --- | --- |
+| `plotVesselGeometry` | Source geometry (top) and saved Capytaine hull mesh (bottom) | No; mesh shown when available | No |
+| `plotVesselHydrodynamics` | Hydrodynamic coefficients, RAOs and damping | Yes | Yes |
+
+Add only `matlab/` to the path; its `private/` support functions are found automatically. Preview source geometry with:
+
+```matlab
+addpath('/path/to/MSS-Capytaine/matlab')
+plotVesselGeometry('capytaine_offsets_csv/testShip')
+plotVesselGeometry('shipx_mgf/supply')
+plotVesselGeometry('wamit_gdf/tanker')
+plotVesselGeometry('mesh_stl/wigley')
+```
+
+The top subplot needs no solve, result file, Python process or MSS installation. CSV/MGF display hull sections (MGF highlights the wetted portions); GDF/STL display source panels. The JSON CG is marked in red. The bottom subplot reads `generated_hull_panels.mat` from the configured `output_dir` (default `results/`) and shows the saved hull panels, without the internal solver lid. It uses the saved vessel CG when available. Before solving it displays a message instead. After editing geometry or meshing settings, rerun Python to refresh the saved mesh; plotting itself never generates or updates it. A unique vessel name or a JSON path also works. When an extension is missing, the reader identifies the file contents.
+
+The README preview is exported from these same MATLAB plots using [exportGeometryPreview.m](tests/exportGeometryPreview.m). With saved meshes available, regenerate it without a BEM solve:
+
+```matlab
+addpath('tests')
+exportGeometryPreview()
 ```
 
 ## Plot in Python
@@ -261,83 +222,119 @@ python plot_results.py
 python plot_results.py --heading 90 --show
 ```
 
-The script reads `vessels_capytaine/testShip/results/testShip.mat` and saves six PNG figures in `vessels_capytaine/testShip/results/plots/`. It does not rerun the hydrodynamics or change the result file. The coefficient plots show the infinite-frequency values as separate markers at the `10 rad/s` label; RAO plots use only finite frequencies.
+The script reads `vessels_capytaine/capytaine_offsets_csv/testShip/results/testShip.mat` and saves six PNG figures in `vessels_capytaine/capytaine_offsets_csv/testShip/results/plots/`. It does not rerun the hydrodynamics or change the result file. The coefficient plots show the infinite-frequency values as separate markers at the `10 rad/s` label; RAO plots use only finite frequencies.
 
 To plot `LAUV_marie`, pass its result file explicitly:
 
 ```sh
-python plot_results.py vessels_capytaine/LAUV_marie/results/LAUV_marie.mat
-python plot_results.py vessels_capytaine/LAUV_marie/results/LAUV_marie.mat --heading 90
+python plot_results.py vessels_capytaine/capytaine_offsets_csv/LAUV_marie/results/LAUV_marie.mat
+python plot_results.py vessels_capytaine/capytaine_offsets_csv/LAUV_marie/results/LAUV_marie.mat --heading 90
 ```
 
-These figures are saved in `vessels_capytaine/LAUV_marie/results/plots/`. All six RAO panels use the same frequency limits. At symmetry headings such as 0° and 180°, the sway, roll, and yaw responses are identically zero for a port-starboard symmetric body; their phase is undefined and is labeled as such instead of being plotted on an arbitrary autoscaled frequency axis.
+These figures are saved in `vessels_capytaine/capytaine_offsets_csv/LAUV_marie/results/plots/`. All six RAO panels use the same frequency limits. At symmetry headings such as 0° and 180°, the sway, roll, and yaw responses are identically zero for a port-starboard symmetric body; their phase is undefined and is labeled as such instead of being plotted on an arbitrary autoscaled frequency axis.
 
 RAO phase figures use the principal interval from -180° to 180°. This maps equivalent 0° and 360° values to the same phase and removes artificial two-pi jumps. Curves are broken at genuine 180° phase reversals, and phase is hidden where the RAO magnitude is negligible, since phase is undefined at a zero response.
 
-## Inputs
+## Tanker comparison with WAMIT
 
-Offset CSV files contain the columns `x_m,z_m,half_breadth_m`; `x` points aft, `z` points upward, and half breadth is nonnegative. For a surface vessel, the origin is at midships on the design waterline, and each section runs from keel to `z = 0`. For a submerged body, each section is a closed bottom-to-top profile with zero half breadth at both ends, and the origin is body-fixed.
+**WAMIT is the reference benchmark for the project's 3D potential-flow comparison.** WAMIT and Capytaine both solve three-dimensional radiation and diffraction problems using boundary-element methods. Comparing the same tanker geometry and loading condition provides a direct check of the BEM results and the conversion to MSS conventions.
 
-`vessels_capytaine/testShip/config.json` specifies the mesh resolution, mass, radii of gyration (or an inertia-matrix CSV), center of mass, and wave frequencies. The center of mass is also used as the rotation center, so all hydrodynamic matrices, forces, and motions are referenced to the CG. The solver always uses 19 wave directions from 0° to 180° in 10° increments; the MSS export workflow fixes these, so they are not configuration inputs. The limiting-frequency calculations assume infinite water depth, the default when `water_depth_m` is absent or `null`.
+The [tanker GDF comparison](vessels_capytaine/wamit_gdf/tanker/validation/README.md) compares existing Capytaine and MSS WAMIT results at the same CG in MSS FSD, including added mass, radiation damping, and complex force RAOs. Overlay plots and error tables cover 40 finite samples over 0.0424–1.8003 rad/s:
 
-Set `submerged` to `false` for a surface vessel. The solver then generates an internal waterplane lid to suppress artifacts at irregular frequencies. Set it to `true` for a submerged vehicle such as an AUV; no lid is generated.
+| Compared quantity | Relative norm differences across the six DOFs |
+| --- | ---: |
+| Diagonal added mass A | 0.31–0.69% |
+| Diagonal radiation damping B | 0.49–1.72% |
+| Complex excitation-force RAOs, pooling all 36 headings per DOF | 0.09–0.61% |
 
-A submerged case also requires `submergence_depth_m`, the positive-down depth of the body-fixed origin used as the fixed equilibrium position for the free-surface solve. The complete hull must remain below the free surface. It is not an average of hydrodynamic coefficients over a depth range. Each value therefore defines a separate Capytaine model: small values give stronger free-surface interaction and wave excitation, while increasing the value progressively reduces wave excitation and makes the radiation coefficients approach their deeply submerged limits. Large values such as 20 m or 100 m are accepted, but much of the first-order wave excitation may then be extremely small; long, low-frequency waves penetrate more deeply than short, high-frequency waves. This translation affects the added mass, radiation damping, and RAOs but is removed from the exported MSS CG, CB, and panel coordinates.
+**The close agreement supports confidence in the solver workflow and the MSS axis, unit, reference-point and phase conversions.** These percentages are norm differences over the stated frequency band, not maximum errors at every sample. This benchmark checks agreement with an independent numerical solver; it does not establish mesh convergence for every vessel or agreement with experiments. The current tanker grid uses rounded WAMIT frequencies, so the comparison includes interpolation. Higher finite frequencies were excluded following mesh-resolution warnings.
 
-For the `LAUV_marie` example, 1.0 m is the recommended reference depth when one generated model will be reused over a larger operating-depth range in MSS. The 0.15 m diameter hull remains fully submerged at this center depth, and choosing the shallowest intended operating depth avoids extrapolating the wave loads upward from a deeper model. In the MSS runtime model, the generated force RAOs are used without amplification when `d <= d_ref`, while greater depths may use the one-sided deep-water attenuation
+Inspect or reproduce the calculation with the [Python comparison test](tests/compare_tanker_wamit.py):
 
-```text
-exp[-(omega^2/g) (d - d_ref)],    d > d_ref,
+```sh
+python tests/compare_tanker_wamit.py
 ```
 
-where `d_ref = vessel.main.submergenceDepth`. This runtime approximation attenuates the wave-excitation force only; it does not recompute the depth-dependent added mass or radiation damping. Users whose vehicle operates mainly at another depth can instead set `submergence_depth_m` to that representative depth and regenerate the complete Capytaine model. For submerged bodies, `vessel.main.T` is the body height rather than a surface-vessel draft. Use `output_filename` to give each catalog case its own `.mat` filename.
+It uses saved results and does not rerun either hydrodynamic solver.
 
-`samples_per_section` controls resolution around each half section, while `number_of_stations` controls resolution along the hull. Check Capytaine's mesh-resolution warnings at the highest wave frequencies. The workflow checks the reciprocal `A_ij`/`A_ji` and `B_ij`/`B_ji` coupling terms before symmetrizing the added-mass and radiation-damping matrices as required at zero speed. It reports a warning when the local reciprocity error exceeds 1%, and the skew also exceeds 0.1% of the largest matrix norm over the solved frequency range. This avoids misleading ratios where submerged-body radiation damping is numerically close to zero. If a warning is reported, refine the mesh and rerun the calculation before accepting the exported model.
+## Supply comparison with ShipX
 
-## Viscous damping correction
+The [supply comparison](vessels_capytaine/shipx_mgf/supply/validation/README.md) compares saved Capytaine and MSS ShipX/VERES data at the exact 33 ShipX frequency points from 0.1047198 to 1.795196 rad/s, without interpolation. It shifts the reference from its waterline motion point to the actual CG, then compares added mass, potential damping, force RAOs and hydrostatics. Inspect the [Python comparison test](tests/compare_supply_shipx.py) or run `python tests/compare_supply_shipx.py`; neither solver is rerun.
 
-The `viscous_damping` object contains the vessel-type-specific inputs used by MSS `computeManeuveringModel`. They are stored unchanged in `vessel.powerBased`; Python does not construct a second viscous-damping matrix.
+**This is a comparison of different hydrodynamic approximations.** The archived ShipX run uses ordinary strip theory, assembling two-dimensional sectional solutions with approximations to longitudinal three-dimensional effects; Capytaine models the complete three-dimensional hull. This differs from the WAMIT/Capytaine BEM benchmark above. ShipX also offers a separate VERES3D solver; it was not used for this archived supply dataset. See [SINTEF's description of VERES and VERES3D](https://www.sintef.no/en/software/shipx/shipx-vessel-responses-veres/).
 
-For a surface vessel, `kappa_126` gives dimensionless relative damping increments for surge, sway, and yaw. `delta_zeta_345` gives additional damping ratios for heave, roll, and pitch:
+Surge is excluded from the error tables and plots because MSS estimates its surge added mass and damping from sway data. The report separates force amplitude and complex errors and explains the method and phase-reference limits. Substantial differences remain after matching frequencies, including pitch-damping norm differences of about 72%. The different theories are a plausible contributor; their individual contributions have not been isolated. Mesh convergence and the archived wave-phase origin still require investigation before assigning all differences to strip theory. This is a diagnostic comparison, not an accuracy acceptance test. See [tests](tests/README.md) for commands and reference-file options.
 
-```json
-"viscous_damping": {
-  "kappa_126": [0.05, 0.05, 0.05],
-  "delta_zeta_345": [0, 0.1, 0]
-}
-```
+## Configuration reference
 
-For a submerged vehicle, heave is unrestrained along with surge, sway, and yaw. `T_1236` therefore specifies four positive target time constants in seconds for those modes, while `delta_zeta_45` gives damping-ratio increments for the restored roll and pitch modes:
-
-```json
-"viscous_damping": {
-  "T_1236": [50, 5, 5, 5],
-  "delta_zeta_45": [0.2, 0.2]
-}
-```
-
-The stored values document the selected damping assumptions and match the defaults in `computeManeuveringModel`. After loading the exported vessel, call `computeManeuveringModel(vessel, omega_p)`. It computes `A_eq`, `B_eq`, the single constant diagonal `powerBased.Bv`, and `D = B_eq + Bv`. For a surface vessel, `Bvii = kappa_i B_eq,ii` in DOFs 1, 2, and 6, and `Bvii = 2 delta_zeta_i sqrt(Mii Gii)` in DOFs 3, 4, and 5. For a submerged vehicle, the target damping in DOFs 1, 2, 3, and 6 is `Mii / T_i`; the viscous contribution is `Bvii = Mii / T_i - B_eq,ii`. The requested time constants must not require a negative viscous contribution. Roll and pitch use the same damping-ratio formula as the restored modes of a surface vessel.
-
-Capytaine motion RAOs use potential-flow damping only. It does not export the top-level frequency-dependent `vessel.Bv`.
+See [How to configure a JSON file](How%20to%20configure%20the%20vessel%20JSON%20file.md) for the complete field reference, FSD origins and signs, CSV/MGF/GDF/STL selection, submerged depth, damping models with [equations and worked examples](How%20to%20configure%20the%20vessel%20JSON%20file.md#viscous-damping-equations-and-examples), and frequency limits. The solver always uses zero forward speed and the fixed 10-degree heading grid.
 
 ## Outputs
 
-`vessels_capytaine/testShip/results/testShip.mat` contains `MRB`, `A`, `B`, `C`, the power-based damping inputs, force and motion RAOs, frequencies, and headings in MSS forward-starboard-down axes at the center of gravity. For a surface vessel, the hydrostatic restoring matrix `C` is confined to the heave, roll, and pitch block. For a fully submerged vehicle, heave waterplane stiffness is zero; `LAUV_marie` has restoring stiffness only in roll and pitch from its assumed vertical CG–CB separation. The exported `vessel.main` structure records the `submerged` flag and nominal `submergenceDepth` used by the free-surface solve.
+Panel MAT and NPZ files store MSS FSD `vertices`, `faces`, and `coordinate_system = MSS_FSD`; MAT faces are one-based and NPZ faces are zero-based. These contain the full hull in body-fixed coordinates without the solver lid or submerged equilibrium-depth translation.
+
+`vessels_capytaine/capytaine_offsets_csv/testShip/results/testShip.mat` contains `MRB`, `A`, `B`, `C`, the power-based damping inputs, force and motion RAOs, frequencies, and headings in MSS forward-starboard-down axes at the center of gravity. For a surface vessel, the hydrostatic restoring matrix `C` is confined to the heave, roll, and pitch block. For a fully submerged vehicle, heave waterplane stiffness is zero; `LAUV_marie` has restoring stiffness only in roll and pitch from its assumed vertical CG–CB separation. The exported `vessel.main` structure records the `submerged` flag and nominal `submergenceDepth` used by the free-surface solve.
 
 The coefficient frequency grid includes zero frequency and the infinite-frequency radiation solution, labeled `10 rad/s`. The force and motion RAOs use only the positive finite frequencies below `10 rad/s`. The fixed 19 headings from 0° to 180° in 10° increments are mirrored to the full 36-heading set from 0° to 350° required by MSS.
 
-Every value configured in `omega_rad_s` must be strictly below 10 rad/s. The solver rejects values greater than or equal to 10 because the exporter always reserves and appends 10 rad/s for the separately computed infinite-frequency
-radiation result.
+Every value configured in `omega_rad_s` must be strictly below 10 rad/s. The solver rejects values greater than or equal to 10 because the exporter always reserves and appends 10 rad/s for the separately computed infinite-frequency radiation result.
 
-The results directory also contains `hydrostatics.json` and the generated hull panels in `.mat` and `.npz` formats. The hull and inertia values are synthetic demonstration data; numerical accuracy depends on mesh resolution.
+The results directory also contains `hydrostatics.json` and the generated hull panels in `.mat` and `.npz` formats. The testShip hull and inertia are synthetic demonstration data; numerical accuracy depends on mesh resolution.
+
+## Twin hulls and catamarans
+
+**Monohulls and rigid, port-starboard symmetric catamarans are supported.** Choose the geometry input as follows:
+
+| Input | Catamaran geometry |
+| --- | --- |
+| CSV offsets | Supply one locally symmetric demi-hull and set `demihull_spacing_m` to the centerline-to-centerline separation. The mesher builds two identical hulls at y = ±spacing/2. |
+| STL mesh | Include both hulls at their actual separation in one file, in metres and MSS FSD. |
+| WAMIT GDF | Supply the complete assembly, or native symmetry flags that expand to both hulls. |
+| ShipX MGF | The current importer handles monohull sections only. |
+
+Use the total vessel mass, combined CG and full-vessel inertia. Both hulls share the same six rigid-body motions, and the panel solve includes their hydrodynamic interaction. Inspect mesh resolution and the internal lid; the open-water gap must remain fluid and must not be covered by artificial hull or lid panels.
+
+The Otter examples use the same assumed physical hull at [55 kg](vessels_capytaine/capytaine_offsets_csv/otter_55kg/) and [80 kg](vessels_capytaine/capytaine_offsets_csv/otter_80kg/) (MSS's 55 kg vessel plus 25 kg payload). Each has its own waterline, equilibrium attitude, CG and full inertia. The 55 kg case finds its changed static heave and trim on the same hull. These are not measured Otter lines or validated wave models. Preview them with `plotVesselGeometry('otter_55kg')` and `plotVesselGeometry('otter_80kg')` before solving.
+
+Asymmetric demi-hulls need complete GDF/STL geometry, with overall port/starboard symmetry for the current heading mirroring. See the [geometry guide](How%20to%20configure%20the%20vessel%20JSON%20file.md#twin-hulls-and-catamarans).
+
+The power-based weighting peak is selected during MSS post-processing: `plotVesselHydrodynamics('otter_55kg', 1.5)` uses 1.5 rad/s; omitting the second argument uses an illustrative 0.8 rad/s default. This reweights saved A/B data without a Python rerun. See the [JSON and processing guide](How%20to%20configure%20the%20vessel%20JSON%20file.md#what-mss-computes) for interpretation.
+
+Surface JSON damping inputs now use **`T_126` in seconds** for total surge, sway and yaw velocity-decay targets, together with `delta_zeta_345` for the restored modes. The former `kappa_126` percentage field is rejected with migration instructions. Submerged `T_1236` inputs are unchanged. MATLAB prints specified time constants beside the potential-flow maximum values and stops if a target requires negative additional viscous damping. These are diagonal equivalent-model targets; coupled decay times can differ.
+
+After editing only damping inputs, update the saved MAT metadata without BEM:
+
+```sh
+python main.py shipx_mgf/supply --update-damping
+```
+
+Then call `vessel = plotVesselHydrodynamics('supply')` to obtain the processed model and plots. The local private helper supports these inputs with the existing MSS; the separate MSS interface update is postponed. Do not pass time constants into an older MSS function's percentage argument. Geometry, mass and frequency changes still require the appropriate new solve/export.
 
 ## Current scope and limitations
 
 - The calculation is restricted to zero forward speed.
 - The exported RAOs are first-order; second-order wave-drift loads are not computed.
-- Directional mirroring assumes a port-starboard symmetric monohull.
+- Directional mirroring assumes a port-starboard symmetric rigid vessel.
+- Catamaran hulls move together as one rigid vessel; independent hull motions and structural flexibility are outside the current model.
 - Zero- and infinite-frequency radiation calculations currently require infinite water depth.
 - Mesh convergence and frequency-range convergence must be checked for each new hull.
+
+## Recommended citation
+
+If you use MSS-Capytaine in your work, please cite the software as:
+
+> Fossen, Thor I. (2026). *MSS-Capytaine* [Computer software]. GitHub. https://github.com/cybergalactic/MSS-Capytaine
+
+BibTeX:
+
+```bibtex
+@software{Fossen2026_MSScapytaine,
+  author  = {Fossen, Thor I.},
+  title   = {MSS-Capytaine},
+  year    = {2026},
+  url     = {https://github.com/cybergalactic/MSS-Capytaine}
+}
+```
 
 ## Related projects
 

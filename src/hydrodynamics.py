@@ -8,59 +8,15 @@ from pathlib import Path
 
 import numpy as np
 
+from .output_coordinates import transform_matrix, transform_positions
+from .damping import validate_damping as _viscous_damping_parameters
+
 
 DOFS = ("Surge", "Sway", "Heave", "Roll", "Pitch", "Yaw")
 MSS_WAVE_DIRECTIONS_DEG = np.arange(0.0, 181.0, 10.0)
 LOG = logging.getLogger(__name__)
 RECIPROCITY_WARNING_THRESHOLD = 0.01
 RECIPROCITY_GLOBAL_WARNING_THRESHOLD = 1e-3
-
-
-def _viscous_damping_parameters(
-    settings: object,
-    submerged: bool = False,
-) -> dict[str, np.ndarray]:
-    """Validate damping inputs stored for the MATLAB power-based model."""
-    if not isinstance(settings, dict):
-        raise ValueError("viscous_damping must be an object")
-
-    if submerged:
-        schema = {
-            "T_1236": (4, True),
-            "delta_zeta_45": (2, False),
-        }
-    else:
-        schema = {
-            "kappa_126": (3, False),
-            "delta_zeta_345": (3, False),
-        }
-
-    expected = set(schema)
-    unknown = set(settings) - expected
-    missing = expected - set(settings)
-    if unknown:
-        raise ValueError(
-            "Unknown viscous_damping entries: " + ", ".join(sorted(unknown))
-        )
-    if missing:
-        raise ValueError(
-            "Missing viscous_damping entries: " + ", ".join(sorted(missing))
-        )
-
-    parameters = {}
-    for name, (size, strictly_positive) in schema.items():
-        values = np.asarray(settings[name], dtype=float)
-        if values.shape != (size,) or not np.all(np.isfinite(values)):
-            raise ValueError(
-                f"viscous_damping.{name} must contain {size} finite numbers"
-            )
-        if strictly_positive and np.any(values <= 0):
-            raise ValueError(f"viscous_damping.{name} must be positive")
-        if not strictly_positive and np.any(values < 0):
-            raise ValueError(f"viscous_damping.{name} must be nonnegative")
-        parameters[name] = values
-
-    return parameters
 
 
 def _vector3(value: object, name: str) -> tuple[float, float, float]:
@@ -77,14 +33,48 @@ def _positive(value: object, name: str) -> float:
     return number
 
 
+def _check_transverse_stability(config: dict, gm_t: float) -> None:
+    """Reject unstable roll or disagreement with an independent GM reference."""
+    z_g = float(config["center_of_mass_m"][2])
+    axes = (f"Configured zG={z_g:g} m. JSON uses MSS FSD (z positive down); "
+            "surface-vessel centers are relative to the waterline, not keel heights. ")
+    if not np.isfinite(gm_t) or gm_t <= 0:
+        raise ValueError(
+            f"Calculated GM_T={gm_t:g} m is not positive. " + axes +
+            "Check the CG sign, origin, hull geometry and loading condition before solving."
+        )
+    if "GM_T_m" not in config:
+        if "GM_T_tolerance_m" in config:
+            raise ValueError("GM_T_tolerance_m requires GM_T_m")
+        return
+    reference = _positive(config["GM_T_m"], "GM_T_m")
+    tolerance = _positive(config.get("GM_T_tolerance_m", max(0.05, 0.02*reference)),
+                          "GM_T_tolerance_m")
+    if abs(gm_t-reference) > tolerance:
+        implied_z = z_g + reference-gm_t
+        raise ValueError(
+            f"GM_T consistency check failed: calculated {gm_t:.4g} m, "
+            f"reference GM_T_m={reference:.4g} m, tolerance {tolerance:.4g} m. "
+            + axes + f"For this hull and reference GM, zG should be approximately "
+            f"{implied_z:.4g} m in FSD. Check the sign and origin; do not alter GM "
+            "merely to make the check pass."
+        )
+
+
 def _mass_matrix(
     config: dict,
     base: Path,
     mass: float,
 ) -> np.ndarray:
-    """Read the configured inertia matrix or build its diagonal form."""
+    """Read a CSV mass matrix at CG or build it from gyration radii.
+
+    Optional R46_m is a signed cross-radius: I46=m*R46_m*abs(R46_m).
+    Omitting it retains the original diagonal inertia.
+    """
     matrix_file = config.get("inertia_matrix_csv")
     if matrix_file:
+        if "R46_m" in config:
+            raise ValueError("R46_m is used with gyration radii, not inertia_matrix_csv")
         matrix = np.loadtxt((base / matrix_file).resolve(), delimiter=",")
     else:
         required = ("R44_m", "R55_m", "R66_m")
@@ -98,6 +88,11 @@ def _mass_matrix(
         matrix = np.diag(
             np.concatenate((np.full(3, mass), mass * radii**2))
         )
+        cross_radius = config.get("R46_m", 0.0)
+        if (isinstance(cross_radius, bool) or not isinstance(cross_radius, (int, float))
+                or not np.isfinite(cross_radius)):
+            raise ValueError("R46_m must be a finite signed radius in metres")
+        matrix[3, 5] = matrix[5, 3] = mass * cross_radius * abs(cross_radius)
 
     matrix = np.asarray(matrix, dtype=float)
     if matrix.shape != (6, 6) or not np.all(np.isfinite(matrix)):
@@ -112,7 +107,8 @@ def _mass_matrix(
         raise ValueError(
             "The first three mass-matrix diagonal entries must equal mass_kg"
         )
-    return matrix
+    # JSON inertia is specified in MSS FSD at CG, including cross terms.
+    return transform_matrix(matrix)
 
 
 def _symmetrize_hydrodynamic_matrix(
@@ -174,7 +170,14 @@ def _symmetrize_hydrodynamic_matrix(
 
 
 def run(config_path: Path) -> Path:
-    """Run Capytaine and write an MSS vessel data file."""
+    """Solve one JSON configuration and return its results directory.
+
+    Geometry may be CSV offsets, ShipX MGF sections, WAMIT GDF or STL panels.
+    JSON CG and inertia use MSS FSD; source MGF/GDF axes are converted internally.
+    Check roll stability and any independent GM_T_m reference before the BEM
+    solve. Export MSS FSD hydrodynamics, hull panels and hydrostatics for either
+    a surface vessel or a fully submerged vehicle (MGF is surface-only).
+    """
     import capytaine as cpt
     from capytaine.post_pro import rao
     import xarray as xr
@@ -188,7 +191,8 @@ def run(config_path: Path) -> Path:
     if "total_damping" in config:
         raise ValueError(
             "Rename total_damping to viscous_damping and review the values: "
-            "the new settings specify additional damping, not total targets"
+            "T_126/T_1236 specify total velocity-decay targets in seconds; "
+            "delta_zeta entries specify additional restored-mode damping ratios"
         )
     damping_parameters = _viscous_damping_parameters(
         config.get("viscous_damping"),
@@ -200,59 +204,9 @@ def run(config_path: Path) -> Path:
     # Geometry
     # ------------------------------------------------------------------
 
-    shipx_archive = config.get("shipx_archive")
-    if shipx_archive:
-        from shipx_geometry import (
-            panels_from_shipx_sections,
-            read_shipx_sections,
-            section_volume_m3,
-        )
+    from .hull_geometry import load_hull
 
-        archive_path = (base / shipx_archive).resolve()
-        sections = read_shipx_sections(
-            archive_path,
-            float(config["draft_m"]),
-        )
-        vertices, faces = panels_from_shipx_sections(
-            sections,
-            int(config.get("shipx_samples_per_section", 20)),
-        )
-        LOG.info(
-            "ShipX source sections: %d; offset-integrated volume: %.3f m3",
-            len(sections),
-            section_volume_m3(sections),
-        )
-    else:
-        from .offset_geometry import (
-            panels_from_sections,
-            read_offset_sections,
-        )
-
-        offsets_path = (base / config["offset_points_csv"]).resolve()
-        if not offsets_path.is_file():
-            raise FileNotFoundError(
-                f"Hull offset points not found: {offsets_path}"
-            )
-        sections = read_offset_sections(
-            offsets_path,
-            submerged=submerged,
-        )
-        number_of_stations = config.get("number_of_stations")
-        vertices, faces = panels_from_sections(
-            sections,
-            samples_per_section=int(config.get("samples_per_section", 20)),
-            number_of_stations=(
-                None
-                if number_of_stations is None
-                else int(number_of_stations)
-            ),
-        )
-
-    if shipx_archive:
-        raise ValueError(
-            "The independent MSS vessel export requires offset_points_csv, "
-            "not shipx_archive"
-        )
+    vertices, faces, geometry_source = load_hull(config, base, submerged)
 
     body_name = config.get("body_name", config_path.parent.name)
     if not isinstance(body_name, str) or not body_name.strip():
@@ -274,6 +228,7 @@ def run(config_path: Path) -> Path:
         config.get("gravity_m_s2", 9.81),
         "gravity",
     )
+    lpp = None if "Lpp_m" not in config else _positive(config["Lpp_m"], "Lpp_m")
     depth_value = config.get("water_depth_m")
     water_depth = (
         np.inf
@@ -281,7 +236,7 @@ def run(config_path: Path) -> Path:
         else _positive(depth_value, "water depth")
     )
 
-    center_of_mass_body = np.asarray(_vector3(
+    center_of_mass_body = transform_positions(_vector3(
         config["center_of_mass_m"],
         "center_of_mass_m",
     ))
@@ -304,7 +259,7 @@ def run(config_path: Path) -> Path:
         submergence_depth = 0.0
         geometry_translation = np.zeros(3)
 
-    # The offset table and configured centers use body-fixed coordinates.
+    # Public inputs are MSS FSD; geometry and CG are now in solver axes.
     # A submerged case is translated only for the free-surface BEM solve.
     # Exported MSS centers and panel geometry remain body fixed.
     body_vertices = vertices.copy()
@@ -359,7 +314,7 @@ def run(config_path: Path) -> Path:
     mesh = cpt.Mesh(
         vertices=vertices,
         faces=faces,
-        name="hull_from_offsets",
+        name="hull",
     )
     # Surface vessels get an internal free-surface lid to suppress irregular
     # frequencies. A submerged vehicle has no waterplane to lid.
@@ -386,7 +341,7 @@ def run(config_path: Path) -> Path:
     displaced_mass = float(immersed.disp_mass(rho=rho))
     if not np.isfinite(displaced_mass) or displaced_mass <= 0.0:
         raise ValueError(
-            "The offsets do not enclose a positive submerged volume"
+            "The hull does not enclose a positive submerged volume"
         )
     relative_mass_error = abs(mass - displaced_mass) / displaced_mass
     if relative_mass_error > 0.01:
@@ -424,6 +379,8 @@ def run(config_path: Path) -> Path:
         hydrostatic_stiffness,
         dtype=float,
     ).copy()
+    gm_t = float(hydrostatic_matrix[3, 3] / (rho * gravity * immersed.volume))
+    _check_transverse_stability(config, gm_t)
     if submerged:
         # A freely submerged body has no restoring force or moment in surge,
         # sway, heave, or yaw.
@@ -485,7 +442,7 @@ def run(config_path: Path) -> Path:
     if "period" not in dataset.coords:
         dataset = dataset.assign_coords(period=("omega", periods))
 
-    dataset.attrs["geometry_source"] = "independent offset points"
+    dataset.attrs["geometry_source"] = geometry_source
     dataset.attrs["coordinate_origin"] = (
         "body-fixed origin"
         if submerged
@@ -619,11 +576,12 @@ def run(config_path: Path) -> Path:
     )
 
     # RAOs use potential-flow radiation damping only. The one viscous-damping
-    # matrix is formed later by computeManeuveringModel from the parameters
-    # exported under vessel.powerBased.
+    # matrix is formed later by the local MATLAB processing helper from the
+    # time constants and ratio increments exported under vessel.powerBased.
     output_dataset["motion_rao"] = rao(output_dataset)
 
     hydrostatics = {
+        "GM_T_m": gm_t,
         "volume_m3": float(immersed.volume),
         "displaced_mass_kg": displaced_mass,
         "body_mass_kg": mass,
@@ -659,6 +617,8 @@ def run(config_path: Path) -> Path:
     }
     if center_of_flotation_mss is not None:
         hydrostatics["center_of_flotation_m"] = center_of_flotation_mss
+    if "demihull_spacing_m" in config:
+        hydrostatics["demihull_spacing_m"] = float(config["demihull_spacing_m"])
 
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / "hydrostatics.json").open(
@@ -683,6 +643,7 @@ def run(config_path: Path) -> Path:
         infinite_added_mass=Ainf,
         infinite_radiation_damping=Binf,
         submerged=submerged,
+        Lpp_m=lpp,
         **damping_parameters,
     )
 

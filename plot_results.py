@@ -1,8 +1,15 @@
-"""Plot the MSS vessel data written by main.py.
+"""Plot saved MSS FSD hydrodynamic results without rerunning the solver.
 
 Examples:
     python plot_results.py
-    python plot_results.py vessels_capytaine/testShip/results/testShip.mat --heading 90
+    python plot_results.py vessels_capytaine/capytaine_offsets_csv/testShip/results/testShip.mat --heading 90
+    python plot_results.py vessels_capytaine/mesh_stl/wigley/results/wigley.mat
+
+Works with results from all four geometry formats. Saves six PNG files in
+plots/ beside the result unless --output-dir is supplied. The 10 rad/s
+coefficient marker represents infinite frequency; RAOs use finite frequencies.
+MATLAB/Octave plotVesselGeometry shows source geometry and saved solver hull
+panels together in two vertically stacked subplots; plotVesselHydrodynamics displays MSS analyses.
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ DOFS = ("Surge", "Sway", "Heave", "Roll", "Pitch", "Yaw")
 DEFAULT_RESULT = (
     Path(__file__).resolve().parent
     / "vessels_capytaine"
+    / "capytaine_offsets_csv"
     / "testShip"
     / "results"
     / "testShip.mat"
@@ -199,14 +207,16 @@ def plot_raos(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "result", nargs="?", type=Path, default=DEFAULT_RESULT,
-        help="MSS vessel .mat file (default: testShip result)",
+        help="MSS vessel .mat file (default: capytaine_offsets_csv/testShip result)",
     )
     parser.add_argument(
         "--heading", type=float, default=0.0,
-        help="Wave heading in degrees (default: 0)",
+        help="MSS wave propagation heading in degrees on the 10-degree grid (default: 0)",
     )
     parser.add_argument(
         "--output-dir", type=Path, default=None,

@@ -1,1 +1,1 @@
-"""Hydrodynamics implementation for the Capytaine test ship."""
+"""Geometry import, meshing, hydrodynamics and MSS FSD export for catalogue cases."""

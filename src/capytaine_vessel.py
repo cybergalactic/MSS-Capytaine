@@ -8,6 +8,8 @@ import numpy as np
 from scipy.io import savemat
 import xarray as xr
 
+from .output_coordinates import transform_positions
+
 
 DOFS = ("Surge", "Sway", "Heave", "Roll", "Pitch", "Yaw")
 
@@ -166,11 +168,12 @@ def write_vessel(
     zero_radiation_damping: np.ndarray,
     infinite_added_mass: np.ndarray,
     infinite_radiation_damping: np.ndarray,
-    kappa_126: np.ndarray | None = None,
+    T_126: np.ndarray | None = None,
     delta_zeta_345: np.ndarray | None = None,
     submerged: bool = False,
     T_1236: np.ndarray | None = None,
     delta_zeta_45: np.ndarray | None = None,
+    Lpp_m: float | None = None,
 ) -> None:
     """Write zero-speed Capytaine results as an MSS vessel structure.
 
@@ -186,13 +189,13 @@ def write_vessel(
     RAOs contain only the positive finite frequencies.
 
     The Capytaine solution is assumed to contain headings from 0 to 180 deg
-    for a port-starboard symmetric monohull. These are mirrored to the full
+    for a port-starboard symmetric rigid vessel. These are mirrored to the full
     0 to 350 deg directional set in the MATLAB vessel structure.
 
     The vessel-type-specific damping parameters are stored under
-    vessel.powerBased. Floating vessels use kappa_126 and delta_zeta_345;
-    submerged vehicles use T_1236 and delta_zeta_45. MATLAB's
-    computeManeuveringModel uses them to form the single constant Bv matrix.
+    vessel.powerBased. Floating vessels use T_126 and delta_zeta_345;
+    submerged vehicles use T_1236 and delta_zeta_45. The local MATLAB
+    processing helper uses these to form the single constant Bv matrix.
     Second-order drift forces are not included.
     """
 
@@ -286,6 +289,9 @@ def write_vessel(
     length = float(
         np.ptp(vertices[:, 0])
     )
+    lpp = length if Lpp_m is None else float(Lpp_m)
+    if not np.isfinite(lpp) or lpp <= 0:
+        raise ValueError("Lpp_m must be positive and finite")
 
     breadth = float(
         2.0 * np.max(np.abs(vertices[:, 1]))
@@ -299,7 +305,7 @@ def write_vessel(
 
     if min(length, breadth, draft) <= 0:
         raise ValueError(
-            "Offset hull must have positive length, breadth, and draft"
+            "Hull must have positive length, breadth, and draft"
         )
 
     volume = float(
@@ -316,7 +322,7 @@ def write_vessel(
         "g": gravity,
         "rho": rho,
 
-        "Lpp": length,
+        "Lpp": lpp,
         "Lwl": length,
         "B": breadth,
         "T": draft,
@@ -330,7 +336,7 @@ def write_vessel(
 
         "C_B": (
             volume
-            / (length * breadth * draft)
+            / (lpp * breadth * draft)
         ),
 
         # MSS FSD coordinates:
@@ -363,6 +369,8 @@ def write_vessel(
 
     if not submerged:
         main["CF"] = cf
+    if "demihull_spacing_m" in hydrostatics:
+        main["demihullSpacing"] = float(hydrostatics["demihull_spacing_m"])
 
     # ------------------------------------------------------------------
     # Added mass
@@ -466,7 +474,7 @@ def write_vessel(
     )
 
     if submerged:
-        if kappa_126 is not None or delta_zeta_345 is not None:
+        if T_126 is not None or delta_zeta_345 is not None:
             raise ValueError(
                 "Submerged vehicles use T_1236 and delta_zeta_45"
             )
@@ -477,10 +485,10 @@ def write_vessel(
     else:
         if T_1236 is not None or delta_zeta_45 is not None:
             raise ValueError(
-                "Floating vessels use kappa_126 and delta_zeta_345"
+                "Floating vessels use T_126 and delta_zeta_345"
             )
         damping_parameters = {
-            "kappa_126": (kappa_126, 3, False),
+            "T_126": (T_126, 3, True),
             "delta_zeta_345": (delta_zeta_345, 3, False),
         }
 
@@ -585,10 +593,8 @@ def write_vessel(
 
         "hydrodynamic_reference": "CG",
         "hydrodynamic_axes": "MSS FSD",
-        "hydrodynamic_source": (
-            "Capytaine submerged offset body"
-            if submerged
-            else "Capytaine monohull offset points"
+        "hydrodynamic_source": dataset.attrs.get(
+            "geometry_source", "independent offset points"
         ),
 
         "viscous_damping_model": (
@@ -621,19 +627,22 @@ def write_vessel(
     # Panel geometry for MATLAB/Python inspection
     # ------------------------------------------------------------------
 
+    panel_vertices = transform_positions(vertices)
     np.savez(
         path.parent
         / "generated_hull_panels.npz",
-        vertices=vertices,
+        vertices=panel_vertices,
         faces=faces,
+        coordinate_system="MSS_FSD",
     )
 
     savemat(
         path.parent
         / "generated_hull_panels.mat",
         {
-            "vertices": vertices,
+            "vertices": panel_vertices,
             "faces": faces + 1,
+            "coordinate_system": "MSS_FSD",
         },
         do_compression=True,
     )

@@ -1,0 +1,26 @@
+Wigley hull mesh provenance
+
+This file documents the mesh source and preparation. It is not a configuration file.
+
+Source: https://commons.wikimedia.org/wiki/File:Wigley_hull.stl
+Download: https://upload.wikimedia.org/wikipedia/commons/8/8e/Wigley_hull.stl
+Licence: CC BY-SA 4.0
+Credit: OpenFOAM Foundation; Wikimedia Commons upload by Ddcampayo
+
+Source SHA-256:
+17f7102a545697ea511ec7f3877ad8a22a24c49f72007e5ac16da891b4cf4e3f
+
+Prepared mesh SHA-256:
+1db7b1f351b83a60e9603942c9b4da2e98062b408a1d76a7413524fad4f67ac9
+
+Preparation:
+- Reversed the source normals.
+- Clipped the hull at source z = 0.
+- Simplified the positive-y half to 900 faces using fast-simplification 0.2.0.
+- Mirrored the half hull for exact port/starboard symmetry.
+- Pinned the free boundary to the waterline.
+- Converted to FSD coordinates using (x, -y, -z) and scaled uniformly by 20.
+- Saved as binary STL.
+
+Prepared mesh panels: 1798
+Prepared mesh volume: 22.12589720334044 m^3

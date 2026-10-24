@@ -1,12 +1,17 @@
-function vessel = plotVesselHydrodynamics(vessel_name)
+function vessel = plotVesselHydrodynamics(vessel_name, omega_p)
 % plotVesselHydrodynamics processes and plots MSS-Capytaine hydrodynamic data.
 %
 % The vessel structure is loaded automatically from:
 %
-%   vessels_capytaine/myVessel/results/myVessel.mat
+%   vessels_capytaine/<format>/myVessel/results/myVessel.mat
 %
-% The function computes the MSS power-based maneuvering model at a wave peak
-% frequency of 0.8 rad/s using the damping inputs exported from config.json.
+% The optional omega_p argument selects the MSS power-based weighting peak
+% in rad/s (default 0.8, an illustrative choice rather than a vessel constant).
+% Choose the physical sea-state peak, not a radiation-damping resonance.
+% It uses the damping inputs exported from config.json.
+% T_126/T_1236 specify total diagonal velocity-decay time constants in seconds.
+% Infeasible targets produce an error with the potential-flow maximum values.
+% After editing only damping settings, use python main.py <case> --update-damping.
 % It displays the constant mass, damping, and restoring matrices and plots the
 % force RAOs, added mass, radiation damping, and viscous damping. Natural
 % periods and damping ratios are also reported for a surface vessel.
@@ -15,6 +20,9 @@ function vessel = plotVesselHydrodynamics(vessel_name)
 %   vessel = plotVesselHydrodynamics('testShip');
 %
 %   vessel = plotVesselHydrodynamics('LAUV_marie');
+%   vessel = plotVesselHydrodynamics('otter_55kg', 1.5);
+% Changing omega_p reweights the saved A/B data; no Python rerun is needed.
+% This post-processing choice does not add forward-speed hydrodynamics.
 %
 % MSS dependencies:
 %   computeManeuveringModel.m
@@ -26,10 +34,13 @@ function vessel = plotVesselHydrodynamics(vessel_name)
 % Author: Thor I. Fossen
 % Date: 2026-10-07
 
-vessel_name = validateVesselName(vessel_name);
-project_root = fileparts(fileparts(mfilename('fullpath')));
-vessel_file = fullfile(project_root, 'vessels_capytaine', vessel_name, ...
-    'results', [vessel_name '.mat']);
+[case_dir, vessel_name] = vesselCatalogueCase(vessel_name);
+if nargin < 2 || isempty(omega_p), omega_p = 0.8; end
+if ~isnumeric(omega_p) || ~isreal(omega_p) || ~isscalar(omega_p) || ...
+        ~isfinite(omega_p) || omega_p <= 0
+    error('MSSCapytaine:InvalidPeakFrequency','omega_p must be a positive finite scalar in rad/s.');
+end
+vessel_file = fullfile(case_dir, 'results', [vessel_name '.mat']);
 
 if exist(vessel_file, 'file') ~= 2
     error('MSSCapytaine:VesselFileNotFound', ...
@@ -61,8 +72,22 @@ if ~isfield(vessel.main, 'name') || ...
         'The loaded vessel.main.name must be "%s".', vessel_name);
 end
 
-omega_p = 0.8;
-vessel = computeManeuveringModel(vessel, omega_p);
+vessel = computeVesselDamping(vessel, omega_p);
+
+if isfield(vessel.powerBased,'T_1236')
+    dampingDofs = [1 2 3 6];
+    targetT = vessel.powerBased.T_1236;
+    maximumT = vessel.powerBased.T_max_1236;
+else
+    dampingDofs = [1 2 6];
+    targetT = vessel.powerBased.T_126;
+    maximumT = vessel.powerBased.T_max_126;
+end
+names = {'Surge','Sway','Heave','Roll','Pitch','Yaw'};
+fprintf('\nMotion       Specified T [s]     T_max [s]\n');
+for index = 1:numel(dampingDofs)
+    fprintf('%-10s %14.6g %14.6g\n',names{dampingDofs(index)},targetT(index),maximumT(index));
+end
 
 display(vessel.M, 'M')
 display(vessel.D, 'D')
@@ -79,25 +104,5 @@ plotTF(vessel, 'force', 'rads')
 plotABC(vessel, 'A')
 plotABC(vessel, 'B')
 plotBv(vessel)
-
-end
-
-function vessel_name = validateVesselName(vessel_name)
-% Validate the catalogue name before using it to construct a file path.
-
-if isstring(vessel_name) && isscalar(vessel_name)
-    vessel_name = char(vessel_name);
-end
-if ~ischar(vessel_name)
-    error('MSSCapytaine:InvalidVesselName', ...
-        'Input must be a vessel catalogue name, such as ''myVessel''.');
-end
-vessel_name = strtrim(vessel_name);
-if isempty(vessel_name) || ...
-        isempty(regexp(vessel_name, '^[A-Za-z0-9_-]+$', 'once'))
-    error('MSSCapytaine:InvalidVesselName', ...
-        ['The vessel name must contain only letters, numbers, ' ...
-         'underscores, and hyphens.']);
-end
 
 end
