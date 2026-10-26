@@ -308,7 +308,7 @@ After editing only damping inputs, update the saved MAT metadata without BEM:
 python main.py shipx_mgf/supply --update-damping
 ```
 
-Then call `vessel = plotVesselHydrodynamics('supply')` to obtain the processed model and plots. The local private helper supports these inputs with the existing MSS; the separate MSS interface update is postponed. Do not pass time constants into an older MSS function's percentage argument. Geometry, mass and frequency changes still require the appropriate new solve/export.
+Then call `vessel = plotVesselHydrodynamics('supply')` to obtain the processed model and plots. The local private helper supports both older MSS installations with the percentage interface and current MSS installations with the time-constant interface. It checks all requested targets against their potential-flow maxima and applies the catalogue time constants. Do not pass time constants directly into an older MSS function's percentage argument. Geometry, mass and frequency changes still require the appropriate new solve/export.
 
 ## Current scope and limitations
 
