@@ -48,4 +48,4 @@ testSavedMesh();
 
 These check source formats, saved panel data, catalogue lookup with MSS names on the path, and missing results, without graphics or a solver run. Check the two-subplot presentation interactively with `plotVesselGeometry('supply')`.
 
-With MSS on the path, also run `testDamping()`. It checks all six surface defaults at 0.8 and 1.0 rad/s, the radiation-only boundary, zero radiation, combined errors for infeasible motions, and migration of old MAT metadata. It requires no graphics or BEM solve.
+With MSS on the path, also run `testDamping()`. It checks all six surface defaults at 0.8 and 1.0 rad/s, both Otter cases at 1.5 rad/s, the submerged LAUV case, the radiation-only boundary, zero radiation, combined errors for infeasible motions, and migration of old MAT metadata. Surface processing supports both older and current MSS damping interfaces and preserves the caller's warning settings. It requires no graphics or BEM solve.
