@@ -1,9 +1,14 @@
 function testDamping()
 % Damping checks require the existing MSS toolbox, but no solve or graphics.
 root = fileparts(fileparts(mfilename('fullpath')));
-helpers = fullfile(root,'matlab','private');
+% MATLAB disallows private folders on the search path. Test an unchanged
+% temporary copy instead of exposing the production helper publicly.
+helpers = tempname;
+mkdir(helpers);
+originalPath = path;
+cleanup = onCleanup(@() cleanupHelper(helpers,originalPath)); %#ok<NASGU>
+copyfile(fullfile(root,'matlab','private','computeVesselDamping.m'),helpers);
 addpath(helpers);
-cleanup = onCleanup(@() rmpath(helpers)); %#ok<NASGU>
 cases = {'capytaine_offsets_csv/testShip','capytaine_offsets_csv/otter_55kg', ...
     'capytaine_offsets_csv/otter_80kg','shipx_mgf/supply','wamit_gdf/tanker','mesh_stl/wigley'};
 for c = 1:numel(cases)
@@ -12,8 +17,15 @@ for c = 1:numel(cases)
     saved = load(fullfile(base,'results',config.output_filename));
     v = saved.vessel;
     v.powerBased = config.viscous_damping;
-    for wp = [0.8 1.0]
+    peaks = [0.8 1.0];
+    if ~isempty(strfind(cases{c},'otter_'))
+        peaks(end+1) = 1.5; % Regression: current MSS treats explicit inputs as T.
+    end
+    for wp = peaks
+        previousWarning = warning('query','MSS:LegacyKappa126');
         result = computeVesselDamping(v,wp);
+        currentWarning = warning('query','MSS:LegacyKappa126');
+        assert(strcmp(previousWarning.state,currentWarning.state));
         assert(~isfield(result.powerBased,'kappa_126'));
         m = diag(result.M); d = diag(result.D);
         assert(max(abs(m([1 2 6])./d([1 2 6])-config.viscous_damping.T_126(:))) < 1e-10);
@@ -22,6 +34,19 @@ for c = 1:numel(cases)
         assert(isequal(result.A,v.A) && isequal(result.B,v.B) && isequal(result.C,v.C));
         assert(isequal(result.motionRAO,v.motionRAO));
     end
+end
+% The submerged call uses the unchanged four-time-constant MSS interface.
+base = fullfile(root,'vessels_capytaine','capytaine_offsets_csv','LAUV_marie');
+config = jsondecode(fileread(fullfile(base,'config.json')));
+auvSaved = load(fullfile(base,'results',config.output_filename));
+auv = auvSaved.vessel;
+auv.powerBased = config.viscous_damping;
+for wp = [0.8 1.5]
+    result = computeVesselDamping(auv,wp);
+    m = diag(result.M); d = diag(result.D);
+    assert(max(abs(m([1 2 3 6])./d([1 2 3 6])-config.viscous_damping.T_1236(:))) < 1e-10);
+    assert(all(result.powerBased.T_1236 <= result.powerBased.T_max_1236));
+    assert(isequal(result.A,auv.A) && isequal(result.B,auv.B) && isequal(result.C,auv.C));
 end
 v = saved.vessel;
 v.powerBased = struct('T_126',[1 1 1],'delta_zeta_345',[0 .1 0]);
@@ -55,4 +80,9 @@ catch problem
     assert(~isempty(strfind(problem.message,'T_126')));
 end
 fprintf('Damping targets, maxima, catalogue defaults and migration checks passed.\n');
+end
+
+function cleanupHelper(folder,originalPath)
+path(originalPath);
+rmdir(folder,'s');
 end
