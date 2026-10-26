@@ -397,7 +397,7 @@ In that example, the maximum allowed T₁ is 20 s. A request for 25 s would requ
 
 Choose time constants using small force-step responses, free velocity decay, measured histories or another justified reference. Use seconds for total velocity-decay targets and damping-ratio increments for restored motions. All entries must be finite; T must be strictly positive and Δζ nonnegative. Use only the pair appropriate to the vessel type. The object name `viscous_damping` is retained, but its T entries target total damping while its Δζ entries add viscous damping to restored motions.
 
-Python stores the inputs under `vessel.powerBased`; MATLAB checks the maxima when constructing B_v and D. The local helper used by `plotVesselHydrodynamics` handles T_126 with the currently installed MSS, whose native surface interface still uses percentage increments. Updating that separate MSS interface is postponed. Do not pass a T_126 vector to the old MSS function's percentage argument. Obtain the processed vessel through:
+Python stores the inputs under `vessel.powerBased`; MATLAB checks the maxima when constructing B_v and D. The private helper used by `plotVesselHydrodynamics` supports both the older percentage-based MSS surface interface and the current T_126 interface. It applies the saved time constants and reports all infeasible targets together. Do not pass a T_126 vector directly to an older MSS function's percentage argument. Obtain the processed vessel through:
 
 ```matlab
 vessel = plotVesselHydrodynamics('supply');
