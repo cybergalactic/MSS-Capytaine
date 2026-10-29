@@ -6,22 +6,22 @@ A case consists of a JSON configuration and geometry in CSV, MGF, GDF or STL for
 
 ## 1. Create a case folder
 
-Choose an input group and create `vessels_capytaine/<group>/myVessel/`, using letters, numbers, underscores, or hyphens for the folder name. Use that same name for `body_name` and `output_filename` (with `.mat` appended) so the MATLAB catalogue helpers can locate the results.
+Create `vessels_capytaine/myVessel_csv/` (or use the `_mgf`, `_gdf` or `_stl` format suffix), using letters, numbers, underscores, or hyphens for the folder name. Set `body_name` to `myVessel` and `output_filename` to `myVessel.mat`. The main MAT result is written beside `config.json`; supporting hydrostatics, panels and plots are stored under `output_dir`, which defaults to `results/`.
 
 Choose the closest starting point:
 
 | Case | Geometry | Configuration |
 | --- | --- | --- |
-| Surface vessel | CSV offsets | [testShip/config.json](vessels_capytaine/capytaine_offsets_csv/testShip/config.json) |
-| Submerged vehicle | CSV offsets | [LAUV_marie/config.json](vessels_capytaine/capytaine_offsets_csv/LAUV_marie/config.json) |
-| Rigid twin hull, approximate Otter | One CSV demi-hull plus centerline spacing | [55 kg](vessels_capytaine/capytaine_offsets_csv/otter_55kg/config.json), [80 kg](vessels_capytaine/capytaine_offsets_csv/otter_80kg/config.json) |
-| Existing hull panel mesh | WAMIT Geometric Data File (`.gdf`) | [tanker/config.json](vessels_capytaine/wamit_gdf/tanker/config.json) |
-| ShipX hull sections | VERES MGF (`.mgf`) | [supply/config.json](vessels_capytaine/shipx_mgf/supply/config.json) |
-| Existing triangle mesh | ASCII or binary STL (`.stl`) | [wigley/config.json](vessels_capytaine/mesh_stl/wigley/config.json) |
+| Surface vessel | CSV offsets | [testShip/config.json](vessels_capytaine/testShip_csv/config.json) |
+| Submerged vehicle | CSV offsets | [LAUV_marie/config.json](vessels_capytaine/LAUV_marie_csv/config.json) |
+| Rigid twin hull, approximate Otter | One CSV demi-hull plus centerline spacing | [55 kg](vessels_capytaine/otter_55kg_csv/config.json), [80 kg](vessels_capytaine/otter_80kg_csv/config.json) |
+| Existing hull panel mesh | WAMIT Geometric Data File (`.gdf`) | [tanker/config.json](vessels_capytaine/tanker_gdf/config.json) |
+| ShipX hull sections | VERES MGF (`.mgf`) | [supply/config.json](vessels_capytaine/supply_mgf/config.json) |
+| Existing triangle mesh | ASCII or binary STL (`.stl`) | [wigley/config.json](vessels_capytaine/wigley_stl/config.json) |
 
-Copy the selected configuration into the new folder as `config.json`. Place the geometry file there too. Keep `config.json` inside the vessel folder, not in the format-group folder. File paths inside JSON are relative to that folder; the command can be run from the repository root.
+Copy the selected configuration into the new folder as `config.json`. Place the geometry file there too. Keep `config.json` inside the vessel folder, inside its vessel-format folder. File paths inside JSON are relative to that folder; the command can be run from the repository root.
 
-If you need a CSV, follow [How to generate offset points using AI](How%20to%20generate%20offsets%20points%20using%20AI.md). The default group is `capytaine_offsets_csv`: the native, free, open-source workflow requiring no commercial licence. Other groups are `shipx_mgf`, `wamit_gdf`, and `mesh_stl`. A unique vessel name works in commands; `group/vessel` is explicit and also works if names repeat across groups. If a geometry file already exists in MGF, GDF or STL, skip AI offset generation.
+If you need a CSV, follow [How to generate offset points using AI](How%20to%20generate%20offsets%20points%20using%20AI.md). CSV is the native, free, open-source workflow. Catalogue folders use `<vessel>_csv`, `<vessel>_mgf`, `<vessel>_gdf` or `<vessel>_stl`. Commands accept that folder name or a unique JSON `body_name`. If a geometry file already exists in MGF, GDF or STL, skip AI offset generation.
 
 ## 2. Choose the vessel type
 
@@ -29,7 +29,7 @@ Use one complete case below. Surface vessels and submerged vehicles use differen
 
 ### Case A: surface vessel
 
-This complete example uses the synthetic testShip properties and a small frequency grid. Copy its [offset CSV](vessels_capytaine/capytaine_offsets_csv/testShip/offset_points.csv) into the same folder to try it. Replace geometry and physical properties when creating your own vessel; the example values are not general defaults.
+This complete example uses the synthetic testShip properties and a small frequency grid. Copy its [offset CSV](vessels_capytaine/testShip_csv/offset_points.csv) into the same folder to try it. Replace geometry and physical properties when creating your own vessel; the example values are not general defaults.
 
 ```json
 {
@@ -60,7 +60,7 @@ In this surface case, `T_126` specifies total velocity-decay time constants in s
 
 ### Case B: submerged vehicle
 
-This complete example uses the idealized LAUV Marie geometry and properties. Copy its [offset CSV](vessels_capytaine/capytaine_offsets_csv/LAUV_marie/offset_points.csv) into a new `vessels_capytaine/capytaine_offsets_csv/mySubmergedVehicle/` folder alongside this config. CG is 1 cm below the body origin in FSD. `submergence_depth_m` places that origin 1 m below the free surface without changing the body-fixed offsets.
+This complete example uses the idealized LAUV Marie geometry and properties. Copy its [offset CSV](vessels_capytaine/LAUV_marie_csv/offset_points.csv) into a new `vessels_capytaine/mySubmergedVehicle_csv/` folder alongside this config. CG is 1 cm below the body origin in FSD. `submergence_depth_m` places that origin 1 m below the free surface without changing the body-fixed offsets.
 
 ```json
 {
@@ -100,7 +100,7 @@ Use valid JSON: double quotes, lowercase `true`/`false`, no comments, and no tra
 | `draft_m` | MGF only: required positive design draft above the geometry baseline. It selects the wetted hull; it does not change JSON CG. |
 | `demihull_spacing_m` | CSV only: optional positive centerline-to-centerline separation of two identical, locally symmetric hulls. Must exceed the single demi-hull beam. Omit for one hull. |
 | `body_name` | Case name; defaults to the configuration folder name. |
-| `output_filename` | A `.mat` filename; defaults to `<body_name>.mat`. |
+| `output_filename` | Main `.mat` filename, written beside `config.json`; defaults to `<body_name>.mat`. |
 | `center_of_mass_m` | Required FSD `[x, y, z]`, relative to the geometry origin. Also the rotation center. |
 | `GM_T_m` | Optional independently known transverse GM in metres, used to check CG sign/origin before solving. Supplied for tanker and supply. |
 | `GM_T_tolerance_m` | Optional absolute tolerance for that check; default is the larger of 0.05 m and 2% of the reference GM. |
@@ -118,7 +118,7 @@ Use valid JSON: double quotes, lowercase `true`/`false`, no comments, and no tra
 | `water_depth_m` | Omit or use `null` for infinite depth. Finite depth is currently unsupported by the complete limiting-frequency workflow. |
 | `omega_rad_s` | Required nonempty list: every value must be positive, finite, and strictly below 10. Sorted and deduplicated internally. |
 | `viscous_damping` | Required object: three surface or four submerged total velocity-decay time constants in seconds, plus restored-mode damping-ratio increments. See [equations and examples](#viscous-damping-equations-and-examples). |
-| `output_dir` | Results folder relative to the config; defaults to `results`. |
+| `output_dir` | Supporting-output folder for hydrostatics, generated panels and plots; relative to the config, defaults to `results`. The main MAT file stays beside the JSON. |
 
 For GDF/STL cases, select the mesh filename and omit the section-sampling settings. For MGF, select the MGF filename, set positive `draft_m` and configure section sampling. MGF import currently supports surface vessels only. For a submerged case, set `submerged` to `true`, supply `submergence_depth_m`, and replace the damping object with the submerged form shown below. No user setting selects solver axes.
 
@@ -127,7 +127,7 @@ For GDF/STL cases, select the mesh filename and omit the section-sampling settin
 From the repository root:
 
 ```sh
-python main.py capytaine_offsets_csv/myVessel
+python main.py myVessel_csv
 ```
 
 A direct path is also accepted: `python main.py path/to/config.json`. The results include `myVessel.mat`, `hydrostatics.json`, and the FSD panel files `generated_hull_panels.mat` and `generated_hull_panels.npz`.
@@ -141,7 +141,7 @@ plotVesselGeometry('myVessel')
 plotVesselHydrodynamics('myVessel');
 ```
 
-For any input format, `plotVesselGeometry('myVessel')` previews the source at the top and the saved Capytaine hull mesh at the bottom, both in FSD. Before solving, the bottom subplot explains that no saved mesh is available. The mesh is read from `output_dir/generated_hull_panels.mat` (default `results/`); rerun Python after changing geometry or sampling to refresh it. Plotting itself does not generate a mesh and needs no MSS installation. Only `plotVesselHydrodynamics` requires MSS. These are the two public plotting functions; `matlab/private/` contains their support functions and needs no separate path setup. Check the mesh and all accuracy warnings before accepting hydrodynamic results. Changing mesh or physical inputs requires rerunning the solve; changing plotting options does not.
+For any input format, `plotVesselGeometry('myVessel')` previews the source at the top and the saved Capytaine hull mesh at the bottom, both in FSD. Before solving, the bottom subplot explains that no saved mesh is available. The mesh is read from `output_dir/generated_hull_panels.mat` (default `results/`); rerun Python after changing geometry or sampling to refresh it. Neither plotting function generates a mesh or needs an MSS installation. These are the two public plotting functions; `matlab/private/` contains their support functions and needs no separate path setup. Check the mesh and all accuracy warnings before accepting hydrodynamic results. Changing mesh or physical inputs requires rerunning the solve; changing plotting options does not.
 
 ## Twin hulls and catamarans
 
@@ -158,7 +158,7 @@ For CSV, write the same `x_m,z_m,half_breadth_m` columns as for a monohull, but 
 
 The mesher first mirrors the local half-sections into one complete demi-hull, then places copies at y = ±spacing/2. It creates no connecting panels across the gap. Python and `plotVesselGeometry` both apply the spacing. CG and inertia in JSON always refer to the **whole vessel**, in the common FSD frame. Without the spacing field, the CSV continues to generate a single symmetric hull. The field is rejected for MGF, GDF and STL to avoid duplicating imported geometry. Spacing must exceed the demi-hull beam; touching or overlapping hulls are rejected.
 
-The Otter cases use [55 kg without added payload](vessels_capytaine/capytaine_offsets_csv/otter_55kg/README.md) or [80 kg](vessels_capytaine/capytaine_offsets_csv/otter_80kg/README.md), MSS's 55 kg vessel plus a 25 kg payload at the body origin. Their assumed contours are fitted to displacement, waterplane area and longitudinal balance; they are not measured Otter hull lines. Both use the same physical hull; the 55 kg case solves its changed static heave and trim. Its CSV, CG and full inertia are rotated into the level equilibrium FSD frame together. The READMEs explain waterline origins, loading transforms and validation limits.
+The Otter cases use [55 kg without added payload](vessels_capytaine/otter_55kg_csv/README.md) or [80 kg](vessels_capytaine/otter_80kg_csv/README.md), MSS's 55 kg vessel plus a 25 kg payload at the body origin. Their assumed contours are fitted to displacement, waterplane area and longitudinal balance; they are not measured Otter hull lines. Both use the same physical hull; the 55 kg case solves its changed static heave and trim. Its CSV, CG and full inertia are rotated into the level equilibrium FSD frame together. The READMEs explain waterline origins, loading transforms and validation limits.
 
 The MGF reader still supports a single monohull contour per station. ShipX/VERES supports multihulls, but this does not imply that every multihull MGF variant is handled by this importer. General asymmetric demi-hulls or different port/starboard hulls require complete panel geometry; the current heading mirroring also requires overall port/starboard symmetry.
 
@@ -181,7 +181,7 @@ Paths are relative to `config.json`. `samples_per_section` and `number_of_statio
 
 MGF contains full-height sections with heights relative to its baseline. `draft_m` is the design waterline height above that baseline; it is required because the geometry alone does not identify the loading condition. The importer preserves bulbous/flat-bottom contours and clips to an upright, untrimmed waterline. Dry stations are omitted. It does not import the entire `.shipx_ship` project archive; extract its MGF first. `supply.mgf` is already extracted in the example case.
 
-STL carries no standard unit or axis declaration. Prepare the file in metres and MSS FSD at the intended origin. No automatic guessing or scaling is performed by the reader. For a surface vessel, submerged points have positive z and the waterline is z = 0. Existing mesh quality still limits useful frequencies. The [Wigley example](vessels_capytaine/mesh_stl/wigley/README.md) records the public source, preparation changes and licence.
+STL carries no standard unit or axis declaration. Prepare the file in metres and MSS FSD at the intended origin. No automatic guessing or scaling is performed by the reader. For a surface vessel, submerged points have positive z and the waterline is z = 0. Existing mesh quality still limits useful frequencies. The [Wigley example](vessels_capytaine/wigley_stl/README.md) records the public source, preparation changes and licence.
 
 The older `offset_points_csv` field is still an alias for `geometry_file`; provide only one of these two fields.
 
@@ -195,13 +195,13 @@ MRB(4,6) = MRB(6,4) = mass_kg × R46_m × abs(R46_m)
 
 `R46_m` is a signed cross-radius, not a fourth positive principal radius. A negative value gives a negative matrix entry. Omission and explicit zero are equivalent. All catalogue examples include the field; only the Otter loads currently use nonzero values. For 80 kg, `R46_m ≈ 0.0927024811` gives the MSS cross-inertia of +0.6875 kg m². This is the actual matrix entry, not a product of inertia to which another minus sign should be applied. All gyration inputs are already in MSS FSD; do not change signs for Python.
 
-For more general coupling, `inertia_matrix_csv` supplies a symmetric 6-by-6 rigid-body mass matrix about CG, ordered surge, sway, heave, roll, pitch, yaw in MSS FSD. It must contain six numeric rows without a header, be finite, symmetric and positive definite, and have its first three diagonal entries equal to `mass_kg`. Omit `R46_m` when selecting this full-matrix alternative. Optional `Lpp_m` specifies length between perpendiculars for exported `vessel.main.Lpp` and the block-coefficient reference length. Otherwise the exporter uses hull x extent. `Lwl` remains a mesh-extent estimate. The tanker sets `Lpp_m: 246` and selects the same 246 m GDF used by the MSS WAMIT run.
+For more general coupling, `inertia_matrix_csv` supplies a symmetric 6-by-6 rigid-body mass matrix about CG, ordered surge, sway, heave, roll, pitch, yaw in MSS FSD. It must contain six numeric rows without a header, be finite, symmetric and positive definite, and have its first three diagonal entries equal to `mass_kg`. Omit `R46_m` when selecting this full-matrix alternative. Optional `Lpp_m` specifies length between perpendiculars for exported `vessel.main.Lpp` and the block-coefficient reference length. Otherwise the exporter uses hull x extent. `Lwl` is not exported; mesh extent is not a substitute for length between perpendiculars. The tanker sets `Lpp_m: 246` and selects the same 246 m GDF used by the MSS WAMIT run.
 
 For a surface vessel, the origin is at midships on the design waterline: positive CG z is below the waterline and negative CG z is above it. The tanker uses `"center_of_mass_m": [3.93, 0, -2.5]`: 3.93 m forward and 2.5 m above the waterline. At 10 m draft, this is 12.5 m above the keel. This project's CG and CB are waterline-referenced FSD coordinates, not keel heights. For a submerged body, coordinates are relative to its body-fixed origin; `submergence_depth_m` separately specifies that origin's positive-down depth.
 
 Offset CSV files contain `x_m,z_m,half_breadth_m`. Use FSD x and z and a nonnegative half breadth (distance to starboard). Rows within each station run from bottom to top, so z decreases; repeated z values represent flat bottom corners. Surface sections start at the centerline keel (z > 0) and end at the waterline (z = 0). Submerged sections run bottom to top with zero half breadth at both ends. Station groups may appear in any x order.
 
-MGF/GDF files retain their standard source-file conventions. Supply the original file in metres without manually changing signs. The GDF loader handles symmetry; the MGF reader clips sections using `draft_m`. Both convert coordinates internally. The JSON CG is always MSS FSD regardless of geometry format. Inspect a GDF with `plotVesselGeometry('wamit_gdf/tanker')`: the top subplot previews the source before solving, and the bottom displays saved solver panels when available. No MSS installation is needed. Both triangles and quadrilaterals are supported. See [the tanker case](vessels_capytaine/wamit_gdf/tanker/README.md) for the supplied mesh's length variants and load-condition notes.
+MGF/GDF files retain their standard source-file conventions. Supply the original file in metres without manually changing signs. The GDF loader handles symmetry; the MGF reader clips sections using `draft_m`. Both convert coordinates internally. The JSON CG is always MSS FSD regardless of geometry format. Inspect a GDF with `plotVesselGeometry('tanker_gdf')`: the top subplot previews the source before solving, and the bottom displays saved solver panels when available. No MSS installation is needed. Both triangles and quadrilaterals are supported. See [the tanker case](vessels_capytaine/tanker_gdf/README.md) for the supplied mesh's length variants and load-condition notes.
 
 ### CG and transverse-stability consistency check
 
@@ -213,7 +213,7 @@ Positive GM alone does not prove that zG has the correct sign. A vessel can rema
 
 ## Frequencies, headings, and submerged depth
 
-`vessels_capytaine/capytaine_offsets_csv/testShip/config.json` specifies the mesh resolution, mass, radii of gyration (or an inertia-matrix CSV), center of mass, and wave frequencies. The center of mass is also used as the rotation center, so all hydrodynamic matrices, forces, and motions are referenced to the CG. The solver always uses 19 wave directions from 0° to 180° in 10° increments; the MSS export workflow fixes these, so they are not configuration inputs. The limiting-frequency calculations assume infinite water depth, the default when `water_depth_m` is absent or `null`.
+`vessels_capytaine/testShip_csv/config.json` specifies the mesh resolution, mass, radii of gyration (or an inertia-matrix CSV), center of mass, and wave frequencies. The center of mass is also used as the rotation center, so all hydrodynamic matrices, forces, and motions are referenced to the CG. The solver always uses 19 wave directions from 0° to 180° in 10° increments; the MSS export workflow fixes these, so they are not configuration inputs. The limiting-frequency calculations assume infinite water depth, the default when `water_depth_m` is absent or `null`.
 
 Set `submerged` to `false` for a surface vessel. The solver then generates an internal waterplane lid to suppress artifacts at irregular frequencies. Set it to `true` for a submerged vehicle such as an AUV; no lid is generated.
 
@@ -231,7 +231,7 @@ For CSV/MGF geometry, `samples_per_section` controls resolution around each half
 
 ## Viscous damping: equations and examples
 
-These inputs describe additional damping for the MSS maneuvering model. They are not all percentages: the surface-vessel inputs are dimensionless, while the submerged vehicle's four time constants are in **seconds**. The numbers in each field name identify the motions in its array:
+These inputs describe additional damping for the MSS maneuvering model. Both surface and submerged time constants are in **seconds**; damping-ratio increments are dimensionless. Nonlinear angular multipliers have units s/rad. The numbers in each field name identify the motions in its array:
 
 | Index | Motion | Velocity |
 | --- | --- | --- |
@@ -242,9 +242,9 @@ These inputs describe additional damping for the MSS maneuvering model. They are
 | 5 | Pitch: rotation about y | q |
 | 6 | Yaw: rotation about z | r |
 
-### What MSS computes
+### What the MATLAB/Octave viewer computes
 
-Capytaine supplies frequency-dependent added mass A(ω) and potential radiation damping B(ω). MSS `computeManeuveringModel` averages these with a normalized wave-spectrum weight to obtain constant matrices A_eq and B_eq. It then forms the effective inertia M and total linear damping D:
+Capytaine supplies frequency-dependent added mass A(ω) and potential radiation damping B(ω). The standalone MATLAB/Octave viewer averages these with a normalized wave-spectrum weight to obtain constant matrices A_eq and B_eq. It then forms the effective inertia M and total linear damping D:
 
 $$
 M = M_{RB} + A_{eq}, \qquad D = B_{eq} + B_v.
@@ -252,13 +252,13 @@ $$
 
 At zero forward speed, Capytaine supplies zero damping at the zero- and infinite-frequency limits. The exported 10 rad/s endpoint is a plotting marker for infinity, not a finite-frequency sample. A finite curve that is still rising at its highest computed frequency has not demonstrated convergence to that limit. Do not interpolate to the infinity marker or include it as a finite point in a damping integral; the unresolved tail needs its own check.
 
-The weighting peak `omega_p` belongs to MSS post-processing, not the geometry JSON or the BEM solve. Select the wave-spectrum peak for the sea state being represented; do not move it to a vessel's radiation-damping peak to obtain larger equivalent damping. It does not change the saved frequency-dependent A/B data. The plotting helper accepts an optional peak frequency in rad/s:
+The weighting peak `omega_p` belongs to MATLAB/Octave post-processing, not the geometry JSON or the BEM solve. Select the wave-spectrum peak for the sea state being represented; do not move it to a vessel's radiation-damping peak to obtain larger equivalent damping. It does not change the saved frequency-dependent A/B data. The plotting helper accepts an optional peak frequency in rad/s:
 
 ```matlab
 vessel = plotVesselHydrodynamics('otter_55kg', 1.5);
 ```
 
-Omitting it uses 0.8 rad/s as an illustrative default, not a universal vessel constant. Use the local plotting helper to apply the current catalogue damping inputs; its returned vessel contains the processed model. At zero speed, vessels in the same sea state see the same wave-spectrum peak. Forward speed requires appropriate treatment of encounter frequencies and hydrodynamic coefficients; changing `omega_p` alone does not add forward-speed hydrodynamics. Small equivalent damping under low-frequency weighting does not imply small radiation damping at a higher roll resonance. No BEM rerun is needed to change this weighting.
+Omitting it uses the fixed **1.0 rad/s JONSWAP reference**, with gamma 3.3. This is a processing baseline, not a universal vessel constant. The normalized spectrum uses the peak-frequency exponent coefficient 5/4, so its peak is at the requested `omega_p`. An explicit argument selects another reference peak. The helper records `omega_p`, `spectrumType` and `gamma` in the returned `vessel.powerBased`, alongside the calculated `A_eq`, `B_eq` and `Bv`. Processing changes the returned structure in memory; it does not rewrite the saved MAT file. Forward speed requires appropriate treatment of encounter frequencies and hydrodynamic coefficients; changing `omega_p` alone does not add forward-speed hydrodynamics. Small equivalent damping under low-frequency weighting does not imply small radiation damping at a higher roll resonance. No BEM rerun is needed to change this weighting.
 
 Here B_v is the **additional diagonal viscous damping** calculated from the JSON settings. M includes added mass; it is not just the dry rigid-body mass. G denotes the hydrostatic restoring matrix. Translation damping coefficients have units N s/m; rotational damping coefficients have units N m s/rad. Positive damping opposes velocity: its force/moment is −Dν.
 
@@ -271,7 +271,8 @@ For `submerged: false`, use this JSON object (the testShip example):
 ```json
 "viscous_damping": {
   "T_126": [20.0, 8.0, 20.0],
-  "delta_zeta_345": [0.0, 0.1, 0.0]
+  "delta_zeta_345": [0.0, 0.1, 0.0],
+  "nonlinear_456": [5.0, 5.0, 0.0]
 }
 ```
 
@@ -301,18 +302,19 @@ $$
 
 At Tᵢ = Tᵢ,max, radiation damping alone meets the requested time constant. If B_eq,ii = 0 there is no finite upper limit. A larger requested T would require cancelling radiation damping. MATLAB reports all offending motions with their requested and maximum values and stops; it never silently clamps inputs. A measured time constant outside this limit flags incompatibility with the selected equivalent model, not proof that the measurement is wrong. The maxima are recomputed whenever the post-processing weighting changes. Coupled modal decay times can differ from these diagonal targets.
 
-The supplied surface examples use these **starting estimates**, checked against the saved results at the illustrative 0.8 rad/s default and at 1.0 rad/s:
+The supplied surface examples use these **starting estimates**, checked against the saved results at the default 1.0 rad/s JONSWAP reference:
 
 | Case | T_126 [s]: surge, sway, yaw | Basis |
 | --- | --- | --- |
 | testShip | [20, 8, 20] | Synthetic example estimates. |
-| Supply | [20, 2.5, 5] | Example estimates within this equivalent model's limits; not transferred from a different supply ship's sea trials. |
-| Tanker | [45, 3, 4] | Example estimates within this equivalent model's limits; not calibrated tanker damping. |
+| Supply | [6.4, 2.4, 3.3] | Example preset, adjusted for feasibility at the reference peak. |
+| S175 | [11.9, 2, 1.8] | Example preset, checked at the reference peak. |
+| Tanker | [47.3, 3.4, 4.4] | Example preset, adjusted for feasibility at the reference peak. |
 | Wigley | [80, 8, 12] | Idealized STL example estimates. |
 | Otter 80 kg | [5, 0.5, 1] | Starting values from the sea-trial-calibrated MSS Otter model; transfer to the approximate wave model still needs validation. |
 | Otter 55 kg | [5, 0.5, 1] | Same starting values, without an independent 55 kg calibration. |
 
-For example, supply T_max is approximately [30.1, 4.29, 9.49] s at the 0.8 rad/s processing default. The older comparison values [88, 45, 12] s cannot be used as total targets for this equivalent model at that setting. No value in this table is a universal vessel-class default.
+For example, supply T_max is approximately [23.2448, 2.49945, 4.51327] s at the 1.0 rad/s JONSWAP reference. Its former 2.5 s sway input slightly exceeds that limit; the supplied value is now 2.4 s. The tanker maxima are approximately [49.6743, 3.57288, 4.63510] s. These limits depend on the saved hydrodynamics and reference spectrum; an explicit peak override can require different feasible targets. No value in this table is a universal vessel-class default.
 
 ### Restored motions: increments in damping ratio
 
@@ -341,6 +343,12 @@ $$
 
 Consequently, the surface example `[0.0, 0.1, 0.0]` adds no viscous damping in heave or pitch and adds 10% of critical damping in roll. Potential damping still acts in all three. For a submerged vehicle, `[0.2, 0.2]` adds 20% of critical damping in roll and pitch. These are scalar diagonal interpretations; the coupled system's modal damping ratios can differ.
 
+### Nonlinear roll, pitch and yaw multipliers
+
+`nonlinear_456 = [kappa4, kappa5, kappa6]` is exported under `vessel.powerBased`. MSS uses the multipliers in the diagonal angular damping coefficients: `D44 * (1 + kappa4 * abs(p))`, and similarly for pitch and yaw. Entries must be finite and nonnegative, with units s/rad. Omitting the field in an older custom JSON assumes `[0, 0, 0]`; all catalogue JSON files specify it explicitly.
+
+The active MSS test-script values have priority: supply, S175 and tanker use `[5, 0, 0]`; testShip and LAUV use `[5, 5, 0]`. The other catalogue cases use zero nonlinear multipliers. Roll damping-ratio increments remain 0.1 for supply/tanker/testShip/Wigley and 0.2 for S175/Otter/LAUV. These are modeling inputs for testing and require recalibration for vessel-specific applications. The two WAMIT-only MSS cases, FPSO and semisub, keep their existing presets.
+
 ### Submerged vehicles: four velocity-decay time constants
 
 For `submerged: true`, replace the surface object with:
@@ -348,7 +356,8 @@ For `submerged: true`, replace the surface object with:
 ```json
 "viscous_damping": {
   "T_1236": [50.0, 5.0, 5.0, 5.0],
-  "delta_zeta_45": [0.2, 0.2]
+  "delta_zeta_45": [0.2, 0.2],
+  "nonlinear_456": [5.0, 5.0, 0.0]
 }
 ```
 
@@ -395,9 +404,9 @@ In that example, the maximum allowed T₁ is 20 s. A request for 25 s would requ
 
 ### Choosing values and applying them
 
-Choose time constants using small force-step responses, free velocity decay, measured histories or another justified reference. Use seconds for total velocity-decay targets and damping-ratio increments for restored motions. All entries must be finite; T must be strictly positive and Δζ nonnegative. Use only the pair appropriate to the vessel type. The object name `viscous_damping` is retained, but its T entries target total damping while its Δζ entries add viscous damping to restored motions.
+Choose time constants using small force-step responses, free velocity decay, measured histories or another justified reference. Use seconds for total velocity-decay targets and damping-ratio increments for restored motions. All entries must be finite; T must be strictly positive and Δζ nonnegative. Use only the linear pair appropriate to the vessel type, plus the common `nonlinear_456` field. The object name `viscous_damping` is retained, but its T entries target total damping while its Δζ entries add viscous damping to restored motions.
 
-Python stores the inputs under `vessel.powerBased`; MATLAB checks the maxima when constructing B_v and D. The private helper used by `plotVesselHydrodynamics` supports both the older percentage-based MSS surface interface and the current T_126 interface. It applies the saved time constants and reports all infeasible targets together. Do not pass a T_126 vector directly to an older MSS function's percentage argument. Obtain the processed vessel through:
+Python stores the inputs under `vessel.powerBased`; MATLAB checks the maxima when constructing B_v and D. The private helper used by `plotVesselHydrodynamics` is self-contained: it accepts the current time-constant inputs, rejects the obsolete `kappa_126` field and reports all infeasible targets together. It does not call an external MSS installation. Obtain the processed vessel through:
 
 ```matlab
 vessel = plotVesselHydrodynamics('supply');
@@ -408,7 +417,7 @@ The helper prints specified time constants beside T_max. Its returned vessel con
 After changing **only** damping settings, refresh an existing MAT file:
 
 ```sh
-python main.py shipx_mgf/supply --update-damping
+python main.py supply_mgf --update-damping
 ```
 
 This replaces damping metadata without a BEM solve, preserves the raw hydrodynamic arrays, and clears derived damping/model caches if present. It does not apply changes to geometry, mass, CG, inertia or the frequency grid; those require an appropriate new solve/export. Repeat MATLAB processing after the refresh. The Python-exported motion RAOs use potential damping only, so the damping settings do not change those saved RAOs.
@@ -424,7 +433,29 @@ Replace the old surface percentage field:
 with positive total time constants in seconds, for example for this supply case:
 
 ```json
-"T_126": [20.0, 2.5, 5.0]
+"T_126": [6.4, 2.4, 3.3]
 ```
 
 Keep `delta_zeta_345`. **Do not copy the percentage numbers into T_126.** Python rejects `kappa_126` with migration instructions before meshing/solving; MATLAB likewise rejects stale MAT damping metadata. Run `--update-damping` after editing the JSON. Submerged `T_1236` and `delta_zeta_45` are unchanged. This damping migration needs no additional JSON version or coordinate-system field. JSON coordinates remain MSS FSD; check the [coordinate conventions](#coordinates-mss-fsd) when migrating older files.
+
+## Optional local panel refinement
+
+For CSV/MGF section meshes, `max_panel_radius_m` optionally bisects large triangles on the existing hull surface. It changes panel resolution without moving hull points. Supply and S175 use 0.75 m, below one eighth of the shortest wavelength at 3.141593 rad/s in deep water. This is a resolution check, not proof of BEM convergence. The larger panel count increases runtime and memory use.
+
+The generated `vessel.main` contains properties used by MSS. JSON does not contain a copy of this structure. Unsupported ShipX hydrodynamic results are omitted, and unused `S`, `Lwl` and `demihullSpacing` are not exported.
+
+### Optional reflection symmetry
+
+`reflection_symmetry: true` enables Capytaine's native port-starboard symmetry for generated CSV/MGF section meshes. The CG must lie on the centerline and the inertia must have the same reflection symmetry; incompatible inputs are rejected. Both the hull and free-surface lid retain symmetry in the solver. Results and exported panels still describe the full hull. This option is enabled for S175 and defaults to false elsewhere.
+
+## Mean-drift coefficients
+
+Every new solve exports `vessel.drift.w` and `vessel.drift.coeff{j}` for Chapter 10, with j=1,2,3 representing physical DOFs 1,2,6. Arrays use `(frequency, heading, speed)` and the same finite-frequency and full-heading grids as the RAOs; only zero speed is computed. Coefficients are real signed loads per incident amplitude squared, referenced to CG in MSS FSD. The far-field method computes horizontal surge/sway forces and yaw moment only. It does not supply heave, roll or pitch drift loads, or cross-frequency QTFs.
+
+The motion contribution uses the exported potential-flow RAOs. The MSS damping settings are separate from drift and the saved motion RAOs. Each mean-drift coefficient is a signed load per squared incident wave amplitude.
+
+The optional numeric `mean_drift_theta_step_deg` controls Kochin angular integration, defaults to 0.5 degrees, must be in (0,10], and must divide 360 exactly. No extra JSON field is required with the default. The solver compares the chosen grid against twice that spacing when the interval count is even, records the componentwise relative norm differences in `hydrostatics.json`, and warns above 2%. Finer angular sampling does not compensate for a coarse hull mesh. Check high-frequency behavior and convergence before using mean drift quantitatively. No negative coefficients are clipped or converted to magnitudes.
+
+A full `python main.py <case>` run is required to add drift to old files; `--update-damping` preserves existing hydrodynamics and cannot compute missing far-field data. For example, `python main.py testShip` generates the data, `python tests/check_mean_drift.py` checks the saved export, and `python plot_results.py` plots it. The drift figure has surge, sway and yaw panels, with one signed curve per heading over frequency. All 36 headings are shown; `--heading` selects only the first-order RAO plots. Plotting reads the saved MAT file and does not rerun BEM.
+
+`plotVesselHydrodynamics('testShip')` displays a mean wave-drift figure immediately after the force RAOs and before added mass when the saved file contains `vessel.drift`. Its three panels plot signed surge, sway and yaw coefficients against frequency, with one line per heading and a shared legend. Units are N/m² for surge/sway and N m/m² for yaw.

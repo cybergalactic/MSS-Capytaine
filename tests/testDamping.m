@@ -1,5 +1,5 @@
 function testDamping()
-% Damping checks require the existing MSS toolbox, but no solve or graphics.
+% Damping checks use only the MSS-Capytaine helper and saved MAT files.
 root = fileparts(fileparts(mfilename('fullpath')));
 % MATLAB disallows private folders on the search path. Test an unchanged
 % temporary copy instead of exposing the production helper publicly.
@@ -9,12 +9,12 @@ originalPath = path;
 cleanup = onCleanup(@() cleanupHelper(helpers,originalPath)); %#ok<NASGU>
 copyfile(fullfile(root,'matlab','private','computeVesselDamping.m'),helpers);
 addpath(helpers);
-cases = {'capytaine_offsets_csv/testShip','capytaine_offsets_csv/otter_55kg', ...
-    'capytaine_offsets_csv/otter_80kg','shipx_mgf/supply','wamit_gdf/tanker','mesh_stl/wigley'};
+cases = {'testShip_csv','otter_55kg_csv', ...
+    'otter_80kg_csv','supply_mgf','s175_mgf','tanker_gdf','wigley_stl'};
 for c = 1:numel(cases)
     base = fullfile(root,'vessels_capytaine',cases{c});
     config = jsondecode(fileread(fullfile(base,'config.json')));
-    saved = load(fullfile(base,'results',config.output_filename));
+    saved = load(fullfile(base,config.output_filename));
     v = saved.vessel;
     v.powerBased = config.viscous_damping;
     peaks = [0.8 1.0];
@@ -36,9 +36,9 @@ for c = 1:numel(cases)
     end
 end
 % The submerged call uses the unchanged four-time-constant MSS interface.
-base = fullfile(root,'vessels_capytaine','capytaine_offsets_csv','LAUV_marie');
+base = fullfile(root,'vessels_capytaine','LAUV_marie_csv');
 config = jsondecode(fileread(fullfile(base,'config.json')));
-auvSaved = load(fullfile(base,'results',config.output_filename));
+auvSaved = load(fullfile(base,config.output_filename));
 auv = auvSaved.vessel;
 auv.powerBased = config.viscous_damping;
 for wp = [0.8 1.5]

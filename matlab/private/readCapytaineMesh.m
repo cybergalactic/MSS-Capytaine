@@ -26,7 +26,7 @@ elseif ~strcmp(char(data.coordinate_system),'MSS_FSD')
 end
 mesh.vertices=vertices; mesh.faces=double(faces); mesh.available=true;
 % Use the solved CG rather than a potentially edited JSON CG on the mesh side.
-vessel_path=fullfile(geometry.results_dir,[geometry.name '.mat']);
+vessel_path=geometry.vessel_path;
 if isfile(vessel_path)
     data=load(vessel_path,'vessel');
     if isfield(data,'vessel') && isfield(data.vessel,'main') && isfield(data.vessel.main,'CG')

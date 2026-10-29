@@ -2,17 +2,17 @@
 
 [Back to README](README.md) · [Configure the JSON file](How%20to%20configure%20the%20vessel%20JSON%20file.md)
 
-Use this guide when you have drawings, dimensions, or photographs and need an offset CSV for MSS-Capytaine. If you already have a WAMIT Geometric Data File (GDF), it contains an existing hull panel mesh. Select its `.gdf` file in JSON and skip offset generation; Python reads the panels directly. An existing ShipX MGF also supplies hull sections directly; CSV generation is only needed for the native `capytaine_offsets_csv` route.
+Use this guide when you have drawings, dimensions, or photographs and need an offset CSV for MSS-Capytaine. If you already have a WAMIT Geometric Data File (GDF), it contains an existing hull panel mesh. Select its `.gdf` file in JSON and skip offset generation; Python reads the panels directly. An existing ShipX MGF also supplies hull sections directly; CSV generation is only needed for the native CSV route.
 
 An AI assistant can organize known offsets or propose an approximate hull. Dimensions and photographs alone do not uniquely determine underwater shape. Keep the source dimensions and the assumptions with the case so the geometry can be reviewed and improved.
 
 ## 1. Collect the source material
 
-Start with the [testShip CSV template](vessels_capytaine/capytaine_offsets_csv/testShip/offset_points.csv) and the closest example case:
+Start with the [testShip CSV template](vessels_capytaine/testShip_csv/offset_points.csv) and the closest example case:
 
-- [testShip](vessels_capytaine/capytaine_offsets_csv/testShip/README.md): a surface vessel with sections running from the keel to the waterline.
-- [LAUV_marie](vessels_capytaine/capytaine_offsets_csv/LAUV_marie/README.md): a submerged body with sections running from the bottom centerline to the top centerline.
-- Otter at [55 kg](vessels_capytaine/capytaine_offsets_csv/otter_55kg/README.md) and [80 kg](vessels_capytaine/capytaine_offsets_csv/otter_80kg/README.md): the same approximate hull at two loads, using one local demi-hull CSV per case and a JSON centerline spacing.
+- [testShip](vessels_capytaine/testShip_csv/README.md): a surface vessel with sections running from the keel to the waterline.
+- [LAUV_marie](vessels_capytaine/LAUV_marie_csv/README.md): a submerged body with sections running from the bottom centerline to the top centerline.
+- Otter at [55 kg](vessels_capytaine/otter_55kg_csv/README.md) and [80 kg](vessels_capytaine/otter_80kg_csv/README.md): the same approximate hull at two loads, using one local demi-hull CSV per case and a JSON centerline spacing.
 
 Give the AI the vessel's length, breadth or diameter, draft or body height, and the position of the coordinate origin. Include a lines plan, body plan, station offsets, cross-sections, or scaled drawings when available. Identify bow and stern explicitly; a symmetric example does not define their shape for your vessel. State the loading condition for a surface vessel.
 
@@ -36,7 +36,7 @@ Use metres and **MSS FSD** throughout:
 
 ![Actual testShip CSV rows linked to a station location and numbered section points in MSS FSD](docs/images/offset-points-csv.png)
 
-The figure uses the five rows at `x_m = 0` in the [testShip CSV](vessels_capytaine/capytaine_offsets_csv/testShip/offset_points.csv). For example, `0,1,3` means x = 0 m, z = 1 m down, and half breadth = 3 m to starboard: the plotted point is (x, y, z) = (0, 3, 1) m. The numbered labels connect the rows to the points; they are not part of the CSV. Only the starboard half is supplied; the program mirrors it to port.
+The figure uses the five rows at `x_m = 0` in the [testShip CSV](vessels_capytaine/testShip_csv/offset_points.csv). For example, `0,1,3` means x = 0 m, z = 1 m down, and half breadth = 3 m to starboard: the plotted point is (x, y, z) = (0, 3, 1) m. The numbered labels connect the rows to the points; they are not part of the CSV. Only the starboard half is supplied; the program mirrors it to port.
 
 For a surface vessel, put the origin at midships on the design waterline. Underwater points have z >= 0. Each section starts at the centerline keel and ends at the waterline, z = 0. Rows run **bottom to top**, so their z values decrease or stay equal. Equal z values can describe flat-bottom corners, but consecutive points must not be identical.
 
@@ -89,7 +89,7 @@ Deliver the CSV plus a separate short note of sources, assumptions, and
 checks. Keep the CSV coordinate convention exactly as specified.
 ```
 
-For the [synthetic testShip](vessels_capytaine/capytaine_offsets_csv/testShip/README.md), an analytic half-breadth formula is available. Asking the AI to sample a known formula gives reproducible offsets; it does not reconstruct an unknown vessel.
+For the [synthetic testShip](vessels_capytaine/testShip_csv/README.md), an analytic half-breadth formula is available. Asking the AI to sample a known formula gives reproducible offsets; it does not reconstruct an unknown vessel.
 
 ## 4. Review and save the offsets
 
@@ -100,7 +100,7 @@ Check the returned CSV against the drawings and dimensions before using it:
 3. Compare the maximum breadth, draft or body height, and longitudinal extent with the intended geometry. Total x extent need not equal Lpp.
 4. Inspect sections for abrupt jumps, unintended asymmetry between bow and stern, and unrealistic flat or pinched regions. Extra interpolation cannot recover shape that was missing from the source data.
 
-Save the file as `vessels_capytaine/capytaine_offsets_csv/myVessel/offset_points.csv`. Save the sources and assumptions in `vessels_capytaine/capytaine_offsets_csv/myVessel/README.md`.
+Save the file as `vessels_capytaine/myVessel_csv/offset_points.csv`. Save the sources and assumptions in `vessels_capytaine/myVessel_csv/README.md`.
 
 ## 5. Configure, solve, and inspect
 
@@ -114,7 +114,7 @@ plotVesselGeometry('myVessel')
 Then run from the repository root:
 
 ```sh
-python main.py capytaine_offsets_csv/myVessel
+python main.py myVessel_csv
 ```
 
 Inspect the exported hull in MATLAB or GNU Octave with MSS on the path:

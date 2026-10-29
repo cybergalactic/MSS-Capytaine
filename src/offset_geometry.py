@@ -8,6 +8,37 @@ from pathlib import Path
 import numpy as np
 
 
+def refine_large_panels(vertices, faces, max_radius):
+    """Bisect oversized triangles without moving the source hull surface.
+
+    Reflections get identical refinement. Shared-edge midpoints are reused;
+    neighbouring panels may meet at a subdivision of an unchanged edge.
+    """
+    if (isinstance(max_radius, bool) or not isinstance(max_radius, (int, float))
+            or not np.isfinite(max_radius) or max_radius <= 0):
+        raise ValueError("max_panel_radius_m must be positive and finite")
+    points = list(map(tuple, vertices))
+    midpoint_ids = {}
+    pending = [tuple(map(int, face[:3])) for face in faces]
+    refined = []
+    while pending:
+        triangle = pending.pop()
+        p = np.asarray([points[i] for i in triangle])
+        if np.linalg.norm(p - p.mean(axis=0), axis=1).max() <= max_radius:
+            refined.append((*triangle, triangle[-1]))
+            continue
+        edges = ((0, 1, 2), (1, 2, 0), (2, 0, 1))
+        a, b, c = max(edges, key=lambda edge: np.linalg.norm(p[edge[0]]-p[edge[1]]))
+        ia, ib, ic = triangle[a], triangle[b], triangle[c]
+        edge = tuple(sorted((ia, ib)))
+        if edge not in midpoint_ids:
+            midpoint_ids[edge] = len(points)
+            points.append(tuple((p[a]+p[b])/2))
+        midpoint = midpoint_ids[edge]
+        pending.extend(((ia, midpoint, ic), (midpoint, ib, ic)))
+    return np.asarray(points), np.asarray(refined, dtype=int)
+
+
 def read_offset_sections(
     path: Path,
     *,

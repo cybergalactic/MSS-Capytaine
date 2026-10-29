@@ -1,54 +1,40 @@
 # Capytaine vessel catalogue
 
-Choose an input route, then a vessel. Each vessel folder contains `config.json`, its geometry, a README and, after solving, a `results/` folder.
+Vessels are listed directly by name, followed by their geometry format. Each folder contains `config.json`, source geometry, a README and the main vessel MAT file. Supporting hydrostatics, generated panels and plots are stored under `results/` (or the configured `output_dir`).
 
-| Group | Input and processing | Cases |
+| Folder | Geometry | MAT filename |
 | --- | --- | --- |
-| `capytaine_offsets_csv` | **Default workflow: free and open source.** Generate panels from your own CSV hull offsets; optional spacing duplicates a demi-hull. No commercial licence is required. | [testShip](capytaine_offsets_csv/testShip/), [LAUV_marie](capytaine_offsets_csv/LAUV_marie/), Otter at [55 kg](capytaine_offsets_csv/otter_55kg/) and [80 kg](capytaine_offsets_csv/otter_80kg/) — two loads of the same approximate twin hull |
-| `mesh_stl` | Load an existing STL triangle mesh. | [wigley](mesh_stl/wigley/) — adapted public benchmark geometry |
-| `shipx_mgf` | Generate panels from ShipX/VERES MGF hull sections. | [supply](shipx_mgf/supply/) |
-| `wamit_gdf` | Load an existing WAMIT Geometric Data File panel mesh. | [tanker](wamit_gdf/tanker/) |
+| [testShip_csv](testShip_csv/) | Native CSV offsets | `testShip.mat` |
+| [LAUV_marie_csv](LAUV_marie_csv/) | CSV offsets, submerged vehicle | `LAUV_marie.mat` |
+| [otter_55kg_csv](otter_55kg_csv/) | Approximate twin hull, no payload | `otter_55kg.mat` |
+| [otter_80kg_csv](otter_80kg_csv/) | Same hull, 25 kg payload | `otter_80kg.mat` |
+| [supply_mgf](supply_mgf/) | Archived ShipX MGF sections | `supply.mat` |
+| [s175_mgf](s175_mgf/) | Archived ShipX MGF sections | `s175.mat` |
+| [tanker_gdf](tanker_gdf/) | WAMIT GDF panels | `tanker.mat` |
+| [wigley_stl](wigley_stl/) | Public STL benchmark | `wigley.mat` |
 
-These group names sort alphabetically, placing the default CSV workflow first. The imported formats can also be solved with Capytaine without running the commercial software that originally produced the geometry.
-
-From the repository root:
+The suffix identifies geometry, not the hydrodynamic solver. Every case is solved by Capytaine. Imported geometry requires no commercial solver licence. CSV remains the default native workflow.
 
 ```sh
 python main.py --list
-python main.py                         # default: CSV testShip
-python main.py capytaine_offsets_csv/testShip
-python main.py capytaine_offsets_csv/LAUV_marie
-python main.py capytaine_offsets_csv/otter_55kg
-python main.py capytaine_offsets_csv/otter_80kg
-python main.py wamit_gdf/tanker
-python main.py shipx_mgf/supply
-python main.py mesh_stl/wigley
+python main.py supply_mgf
+python main.py s175_mgf
 ```
 
-A unique vessel name such as `tanker` is also accepted. If the same vessel appears in several groups, use `group/vessel` to select it explicitly. A direct path to a JSON configuration is accepted too.
-
-Every JSON uses `geometry_file`; its extension selects the reader. If no known extension is present, the reader inspects the file contents. JSON centers and full inertia matrices, CSV offsets, STL vertices, exported panels, and plots use MSS FSD: x forward, y starboard, z down. GDF/MGF files retain their native conventions, which are converted internally. MGF additionally requires `draft_m`, measured above its baseline. See the root [JSON guide](../How%20to%20configure%20the%20vessel%20JSON%20file.md) for all four routes and the surface/submerged damping equations.
-
-Inspect any source geometry before solving (MSS is not required):
+A unique JSON `body_name`, such as `supply` or `s175`, is also accepted. Use the full folder name when more than one geometry represents the same vessel. Direct JSON paths also work. `body_name` and the MAT filename retain the vessel identity without the format suffix.
 
 ```matlab
 addpath('/path/to/MSS-Capytaine/matlab')
-plotVesselGeometry('capytaine_offsets_csv/testShip')
-plotVesselGeometry('wamit_gdf/tanker')
-plotVesselGeometry('shipx_mgf/supply')
-plotVesselGeometry('mesh_stl/wigley')
+plotVesselGeometry('s175')
+plotVesselHydrodynamics('s175');
 ```
 
-Inspect results after solving (MSS is needed for hydrodynamic post-processing):
+JSON contains geometry, loading, frequency, meshing and damping inputs. Derived vessel properties are computed; ShipX coefficient tables, roll-tank damping and drift forces are not appended. Current exports omit unused `vessel.main.S`, `Lwl` and `demihullSpacing`. Hull spacing remains in geometry configuration and the hydrostatics report. The remaining main fields support MSS dynamics, wave generation, loading checks or vessel displays.
 
-```matlab
-plotVesselGeometry('capytaine_offsets_csv/testShip')
-addpath(genpath('/path/to/MSS'))
-plotVesselHydrodynamics('capytaine_offsets_csv/testShip');
-```
+All public geometry and results use MSS FSD. MGF/GDF keep their native file conventions and are converted internally. See the [JSON guide](../How%20to%20configure%20the%20vessel%20JSON%20file.md).
 
-The MATLAB functions accept either `group/vessel` or a unique vessel name. `plotVesselGeometry` shows source geometry at the top and the saved Capytaine hull mesh at the bottom. Before a solve, the mesh subplot shows a message; rerun Python after changing geometry or sampling to refresh the saved panels. The two plotting functions are public; readers and catalogue lookup live in `matlab/private/` and need no separate path setup. Folder name, JSON `body_name` and result filename agree within each vessel folder: `supply`, `supply`, `supply.mat`, for example. The group supplies the input-format context; a suffix on the vessel name is unnecessary.
+The MGF cases produce zero-speed data. The solver exports diagonal Capytaine mean drift in `vessel.drift`, included in all eight supplied vessel MAT files. The testShip case also includes a line plot of the signed coefficients at all 36 headings. Cross-frequency QTFs are not computed.
 
-To copy results into MSS later, use the matching vessel directory under `MSS/HYDRO/vessels_capytaine/`. Updating this catalogue does not update MSS.
+MATLAB/Octave post-processing uses the fixed JONSWAP reference with peak 1.0 rad/s and gamma 3.3 unless an explicit peak is supplied. Damping settings are example inputs, checked for nonnegative additional viscous damping at that reference. See the [release notes](../CHANGELOG.md) for the 1.2 folder and output-path migration.
 
-For rigid symmetric twin hulls, use either a complete GDF/STL assembly or one locally symmetric CSV demi-hull with `demihull_spacing_m`. Always specify the total vessel mass, combined CG and full-vessel inertia. The Otter contours are assumed, fitted to simple hydrostatic constraints rather than measured hull lines. MGF multihull variants remain unsupported; see the [twin-hull guidance](../How%20to%20configure%20the%20vessel%20JSON%20file.md#twin-hulls-and-catamarans).
+Geometry readers supply geometry only; Capytaine solves every case. Additional geometry formats can follow the same interface. No ShipX result comparison is required.

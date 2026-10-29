@@ -15,7 +15,7 @@ from scipy.io import loadmat, savemat
 
 
 def validate_damping(settings: object, submerged: bool = False) -> dict[str, np.ndarray]:
-    """Return validated time constants and restored-mode ratio increments."""
+    """Return validated linear inputs and roll/pitch/yaw nonlinear multipliers."""
     if not isinstance(settings, dict):
         raise ValueError("viscous_damping must be an object")
     if "kappa_126" in settings:
@@ -30,18 +30,22 @@ def validate_damping(settings: object, submerged: bool = False) -> dict[str, np.
         )
     schema = ({"T_1236": (4, True), "delta_zeta_45": (2, False)} if submerged
               else {"T_126": (3, True), "delta_zeta_345": (3, False)})
-    unknown, missing = set(settings) - set(schema), set(schema) - set(settings)
+    # Older user configurations assume no nonlinear angular damping.
+    required = set(schema)
+    schema["nonlinear_456"] = (3, False)
+    unknown, missing = set(settings) - set(schema), required - set(settings)
     if unknown:
         raise ValueError("Unknown viscous_damping entries: " + ", ".join(sorted(unknown)))
     if missing:
         raise ValueError("Missing viscous_damping entries: " + ", ".join(sorted(missing)))
     parameters = {}
     for name, (size, positive) in schema.items():
-        raw = np.asarray(settings[name], dtype=object)
+        supplied = settings.get(name, [0, 0, 0])
+        raw = np.asarray(supplied, dtype=object)
         if raw.shape != (size,) or any(isinstance(x, (bool, str)) for x in raw.flat):
             raise ValueError(f"viscous_damping.{name} must contain {size} finite numbers")
         try:
-            values = np.asarray(settings[name], dtype=float)
+            values = np.asarray(supplied, dtype=float)
         except (TypeError, ValueError) as error:
             raise ValueError(f"viscous_damping.{name} must contain {size} finite numbers") from error
         if not np.all(np.isfinite(values)):
@@ -65,10 +69,10 @@ def refresh_damping(config_path: Path) -> Path:
     if not isinstance(config.get("submerged"), bool):
         raise ValueError("submerged must be true or false")
     parameters = validate_damping(config.get("viscous_damping"), config["submerged"])
-    result = config_path.parent / config.get("output_dir", "results") / config["output_filename"]
+    result = config_path.parent / config["output_filename"]
     if not result.is_file():
         raise FileNotFoundError(f"No saved vessel file to update: {result}. Run the BEM case first.")
-    data = {k: v for k, v in loadmat(result).items() if not k.startswith("__")}
+    data = {k: v for k, v in loadmat(result, mat_dtype=True).items() if not k.startswith("__")}
     vessel = data.get("vessel")
     if vessel is None or vessel.shape != (1, 1) or "powerBased" not in (vessel.dtype.names or ()):
         raise ValueError("The saved MAT file must contain a scalar vessel with powerBased metadata")
@@ -78,7 +82,8 @@ def refresh_damping(config_path: Path) -> Path:
     vessel["powerBased"][0, 0] = power
     # A processed file can contain derived caches. Never leave stale results
     # after changing inputs; the raw A/B/C/MRB and RAOs remain untouched.
-    cached = {"M", "MA", "Minv", "D", "G"}
+    cached = {"M", "MA", "Minv", "D", "G", "kappa_4", "kappa_5", "kappa_6",
+              "hydrodynamic_axes", "viscous_damping_model", "second_order_drift"}
     names = [key for key in vessel.dtype.names if key not in cached]
     if len(names) != len(vessel.dtype.names):
         fresh = np.empty((1, 1), dtype=[(key, object) for key in names])

@@ -11,6 +11,47 @@ import numpy as np
 from .geometry_format import geometry_format
 
 
+def reflection_mesh(mesh):
+    """Represent an xOz-symmetric hull or lid by one half and its mirror."""
+    import capytaine as cpt
+    half = mesh.clipped(origin=(0, 0, 0), normal=(0, 1, 0))
+    return cpt.ReflectionSymmetricMesh(half, plane="xOz", name=mesh.name)
+
+
+def bounded_lid(mesh, max_radius):
+    """Generate Capytaine's interior lid with bounded temporary arrays.
+
+    Classify candidate waterplane vertices in batches rather than allocating
+    one array for every candidate vertex against every hull panel at once.
+    """
+    import capytaine as cpt
+    from capytaine.meshes.predefined.rectangles import mesh_rectangle
+
+    hull = mesh.clipped(origin=(0, 0, 0), normal=(0, 0, 1))
+    if hull.nb_faces == 0:
+        return cpt.Mesh(None, None, name="lid")
+    low, high = hull.vertices.min(axis=0), hull.vertices.max(axis=0)
+    span = high-low
+    candidate = mesh_rectangle(
+        size=(max(max_radius/2, 1.1*span[1]), max(max_radius/2, 1.1*span[0])),
+        faces_max_radius=max_radius,
+        center=((low[0]+high[0])/2, (low[1]+high[1])/2, 0), normal=(0, 0, -1),
+    )
+    panels = hull.vertices[hull.faces, :2]
+    edges = panels[:, [1, 2, 3, 0], :]-panels
+    inside = np.zeros(len(candidate.vertices), dtype=bool)
+    for start in range(0, len(inside), 128):
+        stop = min(start+128, len(inside))
+        local = candidate.vertices[start:stop, None, None, :2]-panels[None]
+        side = local[..., 0]*edges[None, ..., 1]-local[..., 1]*edges[None, ..., 0]
+        above = np.all(side <= 0, axis=-1) | np.all(side >= 0, axis=-1)
+        inside[start:stop] = above.sum(axis=-1) % 2 == 1
+    faces = candidate.faces[np.all(inside[candidate.faces], axis=1)]
+    if not len(faces):
+        return cpt.Mesh(None, None, name="lid")
+    return cpt.Mesh(candidate.vertices, faces, name="lid", auto_check=False)
+
+
 def load_hull(config: dict, base: Path, submerged: bool):
     """Return panels in solver axes: x aft, y starboard, z up, in metres.
 
@@ -39,7 +80,7 @@ def load_hull(config: dict, base: Path, submerged: bool):
             raise ValueError("demihull_spacing_m must be a positive finite centerline-to-centerline distance")
 
     if extension in {".csv", ".mgf"}:
-        from .offset_geometry import panels_from_sections, read_offset_sections
+        from .offset_geometry import panels_from_sections, read_offset_sections, refine_large_panels
 
         if extension == ".mgf":
             if submerged:
@@ -58,6 +99,8 @@ def load_hull(config: dict, base: Path, submerged: bool):
             samples_per_section=int(config.get("samples_per_section", 20)),
             number_of_stations=None if stations is None else int(stations),
         )
+        if "max_panel_radius_m" in config:
+            vertices, faces = refine_large_panels(vertices, faces, config["max_panel_radius_m"])
         source = "ShipX MGF hull sections" if extension == ".mgf" else "independent offset points"
         if spacing is not None:
             beam = 2 * max(float(profile[:, 0].max()) for _, profile in sections)

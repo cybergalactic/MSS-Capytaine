@@ -1,4 +1,4 @@
-"""Fast MGF/STL geometry, grouped lookup and hydrostatics checks."""
+"""MGF/STL geometry, flat catalogue lookup and hydrostatics checks."""
 import json
 from pathlib import Path
 import struct
@@ -9,18 +9,48 @@ import capytaine as cpt
 import numpy as np
 
 from main import _config_path
-from src.hull_geometry import load_hull
+from src.hull_geometry import load_hull, bounded_lid
 from src.shipx_geometry import read_mgf_sections
 from src.stl_geometry import read_stl
 from src.geometry_format import geometry_format
+from src.offset_geometry import refine_large_panels
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class FormatsTest(unittest.TestCase):
+    def test_bounded_lid_matches_native_lid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            rows = ['x_m,z_m,half_breadth_m']
+            for x in (-1, 0, 1):
+                rows.extend([f'{x},1,0', f'{x},1,0.5', f'{x},0,0.5'])
+            (base/'box.csv').write_text('\n'.join(rows)+'\n')
+            v, f, _ = load_hull({'geometry_file': 'box.csv', 'samples_per_section': 4}, base, False)
+            mesh = cpt.Mesh(vertices=v, faces=f)
+            native = mesh.generate_lid(faces_max_radius=.2)
+            batched = bounded_lid(mesh, .2)
+            np.testing.assert_array_equal(batched.vertices, native.vertices)
+            np.testing.assert_array_equal(batched.faces, native.faces)
+
+    def test_local_refinement_preserves_surface(self):
+        vertices = np.array([[0., 0., -1.], [4., 0., -1.], [0., 2., -1.]])
+        faces = np.array([[0, 1, 2, 2]])
+        v, f = refine_large_panels(vertices, faces, .4)
+        triangles = v[f[:, :3]]
+        radius = np.linalg.norm(triangles-triangles.mean(axis=1)[:, None], axis=2)
+        self.assertLessEqual(radius.max(), .4)
+        areas = np.cross(triangles[:, 1]-triangles[:, 0], triangles[:, 2]-triangles[:, 0])
+        self.assertTrue(np.all(areas[:, 2] > 0))
+        self.assertAlmostEqual(np.linalg.norm(areas, axis=1).sum()/2, 4.)
+        np.testing.assert_allclose(v[:, 2], -1.)
+        for invalid in (True, '0.4', None, 0, -1, float('nan')):
+            with self.assertRaises(ValueError):
+                refine_large_panels(vertices, faces, invalid)
+
     def test_missing_extensions(self):
-        for case in ('capytaine_offsets_csv/testShip', 'shipx_mgf/supply',
-                     'wamit_gdf/tanker', 'mesh_stl/wigley'):
+        for case in ('testShip_csv', 'supply_mgf',
+                     'tanker_gdf', 'wigley_stl'):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
                 base = ROOT / 'vessels_capytaine' / case
                 c = json.loads((base / 'config.json').read_text())
@@ -34,10 +64,11 @@ class FormatsTest(unittest.TestCase):
                 np.testing.assert_array_equal(v, original_v)
                 np.testing.assert_array_equal(f, original_f)
 
-    def test_grouped_and_short_lookup(self):
-        for case in ('capytaine_offsets_csv/testShip', 'wamit_gdf/tanker',
-                     'shipx_mgf/supply', 'mesh_stl/wigley'):
-            self.assertEqual(_config_path(case), _config_path(case.split('/')[-1]))
+    def test_folder_and_body_name_lookup(self):
+        for case in ('testShip_csv', 'tanker_gdf',
+                     'supply_mgf', 'wigley_stl'):
+            config = json.loads(_config_path(case).read_text())
+            self.assertEqual(_config_path(case), _config_path(config['body_name']))
         self.assertEqual(_config_path('custom.json'), Path('custom.json'))
 
     def test_mgf_clips_draft_preserves_flat_keel(self):
@@ -92,14 +123,20 @@ class FormatsTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 read_stl(path)
 
-    def test_supply_and_wigley_hydrostatics(self):
-        for case in ('shipx_mgf/supply', 'mesh_stl/wigley'):
+    def test_mgf_and_wigley_hydrostatics(self):
+        for case in ('supply_mgf', 's175_mgf', 'wigley_stl'):
             with self.subTest(case=case):
                 base = ROOT / 'vessels_capytaine' / case
                 c = json.loads((base / 'config.json').read_text())
                 v, f, _ = load_hull(c, base, False)
                 mesh = cpt.Mesh(vertices=v, faces=f)
-                lid = mesh.generate_lid()
+                if 'max_panel_radius_m' in c:
+                    coarse = dict(c)
+                    radius = coarse.pop('max_panel_radius_m')
+                    cv, cf, _ = load_hull(coarse, base, False)
+                    lid = bounded_lid(cpt.Mesh(vertices=cv, faces=cf), radius)
+                else:
+                    lid = mesh.generate_lid()
                 largest_radius = max(mesh.faces_radiuses.max(), lid.faces_radiuses.max())
                 wavelength_eighth = 2*np.pi*c['gravity_m_s2'] / max(c['omega_rad_s'])**2 / 8
                 self.assertLess(largest_radius, wavelength_eighth)

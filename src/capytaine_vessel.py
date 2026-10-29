@@ -9,6 +9,7 @@ from scipy.io import savemat
 import xarray as xr
 
 from .output_coordinates import transform_positions
+from .damping import validate_damping
 
 
 DOFS = ("Surge", "Sway", "Heave", "Roll", "Pitch", "Yaw")
@@ -174,6 +175,8 @@ def write_vessel(
     T_1236: np.ndarray | None = None,
     delta_zeta_45: np.ndarray | None = None,
     Lpp_m: float | None = None,
+    nonlinear_456: np.ndarray | None = None,
+    supporting_output_dir: Path | None = None,
 ) -> None:
     """Write zero-speed Capytaine results as an MSS vessel structure.
 
@@ -196,7 +199,11 @@ def write_vessel(
     vessel.powerBased. Floating vessels use T_126 and delta_zeta_345;
     submerged vehicles use T_1236 and delta_zeta_45. The local MATLAB
     processing helper uses these to form the single constant Bv matrix.
-    Second-order drift forces are not included.
+    nonlinear_456 stores the MSS roll/pitch/yaw damping multipliers.
+    When supplied, mean_drift_force contains signed surge/sway/yaw loads
+    per squared wave amplitude; no cross-frequency QTFs are included.
+    Supporting panel files go to supporting_output_dir (default results/
+    beside the primary MAT file).
     """
 
     # ------------------------------------------------------------------
@@ -323,7 +330,6 @@ def write_vessel(
         "rho": rho,
 
         "Lpp": lpp,
-        "Lwl": length,
         "B": breadth,
         "T": draft,
 
@@ -369,8 +375,6 @@ def write_vessel(
 
     if not submerged:
         main["CF"] = cf
-    if "demihull_spacing_m" in hydrostatics:
-        main["demihullSpacing"] = float(hydrostatics["demihull_spacing_m"])
 
     # ------------------------------------------------------------------
     # Added mass
@@ -492,21 +496,10 @@ def write_vessel(
             "delta_zeta_345": (delta_zeta_345, 3, False),
         }
 
-    power_based = {}
-    for name, (raw_values, size, strictly_positive) in damping_parameters.items():
-        if raw_values is None:
-            raise ValueError(f"{name} is required")
-        values = np.asarray(raw_values, dtype=float)
-        if (
-            values.shape != (size,)
-            or not np.all(np.isfinite(values))
-        ):
-            raise ValueError(f"{name} must contain {size} finite numbers")
-        if strictly_positive and np.any(values <= 0):
-            raise ValueError(f"{name} must be positive")
-        if not strictly_positive and np.any(values < 0):
-            raise ValueError(f"{name} must be nonnegative")
-        power_based[name] = values
+    inputs = {key: value[0] for key, value in damping_parameters.items()}
+    if nonlinear_456 is not None:
+        inputs["nonlinear_456"] = nonlinear_456
+    power_based = validate_damping(inputs, submerged)
 
     # ------------------------------------------------------------------
     # Force RAOs
@@ -566,6 +559,27 @@ def write_vessel(
 
     motion_rao["w"] = omega
 
+    drift_export = None
+    if "mean_drift_force" in dataset:
+        from .mean_drift import DRIFT_DOFS
+        drift = np.asarray(dataset.mean_drift_force.sel(drift_dof=list(DRIFT_DOFS)).transpose(
+            "omega", "wave_direction", "drift_dof"))
+        if np.iscomplexobj(drift):
+            raise ValueError("Mean-drift coefficients must be real and signed")
+        drift = np.asarray(drift, dtype=float)
+        if drift.shape != (len(omega), len(headings), 3) or not np.all(np.isfinite(drift)):
+            raise ValueError("Mean-drift coefficients must be finite on the RAO frequency/heading grid")
+        # Reuse the established heading mirroring with physical DOF parities.
+        full = np.zeros((len(omega), len(headings), 6))
+        full[:, :, [0, 1, 5]] = drift
+        full, drift_headings = _mirror_headings(full, headings)
+        if not np.allclose(drift_headings, headings_full):
+            raise ValueError("Mean-drift and RAO headings must match")
+        coefficients = np.empty((1, 3), dtype=object)
+        for j, dof in enumerate((0, 1, 5)):
+            coefficients[0, j] = full[:, :, dof, None]
+        drift_export = {"w": omega, "coeff": coefficients}
+
     # ------------------------------------------------------------------
     # MSS vessel structure
     # ------------------------------------------------------------------
@@ -592,21 +606,13 @@ def write_vessel(
         "motionRAO": motion_rao,
 
         "hydrodynamic_reference": "CG",
-        "hydrodynamic_axes": "MSS FSD",
-        "hydrodynamic_source": dataset.attrs.get(
-            "geometry_source", "independent offset points"
-        ),
-
-        "viscous_damping_model": (
-            "power-based constant diagonal Bv computed in MATLAB"
-        ),
+        "hydrodynamic_source": "Capytaine",
 
         "powerBased": power_based,
 
-        "second_order_drift": (
-            "not computed"
-        ),
     }
+    if drift_export is not None:
+        vessel["drift"] = drift_export
 
     # ------------------------------------------------------------------
     # MATLAB output
@@ -627,9 +633,12 @@ def write_vessel(
     # Panel geometry for MATLAB/Python inspection
     # ------------------------------------------------------------------
 
+    supporting_output_dir = (path.parent / "results" if supporting_output_dir is None
+                             else Path(supporting_output_dir))
+    supporting_output_dir.mkdir(parents=True, exist_ok=True)
     panel_vertices = transform_positions(vertices)
     np.savez(
-        path.parent
+        supporting_output_dir
         / "generated_hull_panels.npz",
         vertices=panel_vertices,
         faces=faces,
@@ -637,7 +646,7 @@ def write_vessel(
     )
 
     savemat(
-        path.parent
+        supporting_output_dir
         / "generated_hull_panels.mat",
         {
             "vertices": panel_vertices,

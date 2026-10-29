@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from src.offset_geometry import panels_from_sections
 
-BASE = ROOT / "vessels_capytaine/capytaine_offsets_csv/otter_80kg"
+BASE = ROOT / "vessels_capytaine/otter_80kg_csv"
 RHO = 1025.0
 MASS = 80.0
 DRAFT = MASS / RHO / (2 * 0.4 * 0.25 * 2.0)

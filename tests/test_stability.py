@@ -30,7 +30,7 @@ class StabilityTest(unittest.TestCase):
             _check_transverse_stability({'center_of_mass_m': [0, 0, z]}, 10)
 
     def test_real_tanker_and_supply_signs(self):
-        for case in ('wamit_gdf/tanker', 'shipx_mgf/supply'):
+        for case in ('tanker_gdf', 'supply_mgf'):
             with self.subTest(case=case):
                 base = ROOT / 'vessels_capytaine' / case
                 config = json.loads((base / 'config.json').read_text())

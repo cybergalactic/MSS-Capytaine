@@ -7,6 +7,7 @@ fid=fopen(fullfile(folder,'hull.stl'),'wt');
 fprintf(fid,['solid hull\nfacet normal 0 0 1\nouter loop\n' ...
     'vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid hull\n']); fclose(fid);
 config=struct('geometry_file','hull.stl','body_name','example', ...
+    'output_filename','different_name.mat', ...
     'output_dir','custom_results','center_of_mass_m',[0 0 9]);
 file=fullfile(folder,'config.json'); writeConfig(file,config);
 geometry=readVesselGeometry(file);
@@ -17,7 +18,7 @@ vertices=[0 0 0;1 0 0;1 1 1;0 1 1]; faces=[1 2 3 4;1 2 3 3];
 coordinate_system='MSS_FSD';
 save(mesh.path,'vertices','faces','coordinate_system');
 vessel=struct('main',struct('CG',[0 0 0.25]));
-save(fullfile(geometry.results_dir,'example.mat'),'vessel');
+save(fullfile(folder,'different_name.mat'),'vessel');
 mesh=readCapytaineMesh(geometry);
 assert(mesh.available && isequal(mesh.vertices,vertices) && isequal(mesh.faces,faces));
 assert(isequal(mesh.center_of_mass_m,[0 0 0.25])); % Saved CG, not edited JSON CG.

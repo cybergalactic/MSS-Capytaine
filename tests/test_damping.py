@@ -44,21 +44,26 @@ class DampingTest(unittest.TestCase):
             validate_damping(dict(valid,delta_zeta_345=[0,-.1,0]))
         with self.assertRaises(ValueError):
             validate_damping(dict(valid,T_1236=[1]*4))
+        np.testing.assert_array_equal(validate_damping(valid)['nonlinear_456'], [0,0,0])
+        for invalid in ([-1,0,0], [1,2], [True,0,0], [float('inf'),0,0]):
+            with self.subTest(nonlinear=invalid), self.assertRaises(ValueError):
+                validate_damping(dict(valid,nonlinear_456=invalid))
 
     def test_all_catalogue_inputs(self):
-        for path in (ROOT/'vessels_capytaine').glob('*/*/config.json'):
+        for path in (ROOT/'vessels_capytaine').glob('*/config.json'):
             with self.subTest(case=path.parent.name):
                 config = json.loads(path.read_text())
                 validate_damping(config['viscous_damping'],config['submerged'])
 
     def test_refresh_preserves_hydrodynamics_and_cells(self):
-        source = ROOT/'vessels_capytaine/shipx_mgf/supply/results/supply.mat'
+        source = ROOT/'vessels_capytaine/supply_mgf/supply.mat'
         before = loadmat(source)['vessel']
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder)
             shutil.copy2(source,base/'supply.mat')
-            config = {'submerged': False,'output_dir': '.', 'output_filename': 'supply.mat',
-                      'viscous_damping': {'T_126': [20,2.5,5],'delta_zeta_345':[0,.1,0]}}
+            config = {'submerged': False,'output_dir': 'support_files', 'output_filename': 'supply.mat',
+                      'viscous_damping': {'T_126': [20,2.5,5],'delta_zeta_345':[0,.1,0],
+                                         'nonlinear_456':[5,0,0]}}
             (base/'config.json').write_text(json.dumps(config))
             result = refresh_damping(base/'config.json')
             after = loadmat(result)['vessel']
@@ -68,6 +73,7 @@ class DampingTest(unittest.TestCase):
             p = loadmat(result,simplify_cells=True)['vessel']['powerBased']
             self.assertNotIn('kappa_126',p)
             np.testing.assert_array_equal(p['T_126'],[20,2.5,5])
+            np.testing.assert_array_equal(p['nonlinear_456'],[5,0,0])
             config['viscous_damping'] = {'kappa_126':[.05]*3}
             (base/'config.json').write_text(json.dumps(config))
             saved = result.read_bytes()

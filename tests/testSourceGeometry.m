@@ -5,16 +5,16 @@ function geometries = testSourceGeometry()
 entry_points={@plotVesselGeometry,@plotVesselHydrodynamics};
 for i=1:numel(entry_points)
     failed=false;
-    try, entry_points{i}('unknown_format/unknown_vessel');
+    try, entry_points{i}('unknown_vessel');
     catch err, failed=strcmp(err.identifier,'MSSCapytaine:UnknownCase'); end
     assert(failed);
 end
 original_path=path;
 restore_path=onCleanup(@() path(original_path));
 addpath(fullfile(fileparts(which('plotVesselGeometry')),'private'));
-cases={'capytaine_offsets_csv/testShip','capytaine_offsets_csv/LAUV_marie', ...
-    'shipx_mgf/supply','wamit_gdf/tanker','mesh_stl/wigley'};
-expected={'csv','csv','mgf','gdf','stl'};
+cases={'testShip_csv','LAUV_marie_csv', ...
+    'supply_mgf','s175_mgf','tanker_gdf','wigley_stl'};
+expected={'csv','csv','mgf','mgf','gdf','stl'};
 geometries=cell(size(cases));
 folder=tempname; mkdir(folder); cleanup=onCleanup(@() rmdir(folder,'s'));
 % MSS provides tanker.m and supply.m; these must not be treated as JSON files.
@@ -27,12 +27,13 @@ assert(exist('tanker','file')==2 && ~isfile('tanker'));
 assert(exist('supply','file')==2 && ~isfile('supply'));
 for i=1:numel(cases)
     a=readVesselGeometry(cases{i}); assert(strcmp(a.format,expected{i}));
-    [~,short_name]=fileparts(cases{i});
+    [~,short_name]=vesselCatalogueCase(cases{i});
     short=readVesselGeometry(short_name);
     assert(strcmp(short.path,a.path));
     assert(isequal(short.vertices,a.vertices)); assert(isequal(short.sections,a.sections));
     assert(~isempty(a.vertices) || ~isempty(a.sections));
-    mesh=readCapytaineMesh(a); assert(mesh.available);
+    mesh=readCapytaineMesh(a);
+    assert(mesh.available);
     assert(size(mesh.vertices,2)==3 && ~isempty(mesh.faces));
     [case_dir,~]=vesselCatalogueCase(cases{i});
     config=jsondecode(fileread(fullfile(case_dir,'config.json')));

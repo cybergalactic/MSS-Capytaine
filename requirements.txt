@@ -1,0 +1,5 @@
+capytaine>=3.0,<4
+numpy
+scipy
+xarray
+matplotlib

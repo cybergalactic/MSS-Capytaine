@@ -170,7 +170,7 @@ def _symmetrize_hydrodynamic_matrix(
 
 
 def run(config_path: Path) -> Path:
-    """Solve one JSON configuration and return its results directory.
+    """Solve one JSON configuration and return its primary vessel MAT path.
 
     Geometry may be CSV offsets, ShipX MGF sections, WAMIT GDF or STL panels.
     JSON CG and inertia use MSS FSD; source MGF/GDF axes are converted internally.
@@ -198,6 +198,10 @@ def run(config_path: Path) -> Path:
         config.get("viscous_damping"),
         submerged=submerged,
     )
+    # Fail before solving if the installed Capytaine lacks mean-drift support.
+    from capytaine.post_pro.mean_drift_force import far_field_mean_drift_force  # noqa: F401
+    from .mean_drift import compute_mean_drift, kochin_angles, angular_difference
+    theta = kochin_angles(config.get("mean_drift_theta_step_deg", 0.5))
     base = config_path.parent
 
     # ------------------------------------------------------------------
@@ -318,10 +322,46 @@ def run(config_path: Path) -> Path:
     )
     # Surface vessels get an internal free-surface lid to suppress irregular
     # frequencies. A submerged vehicle has no waterplane to lid.
-    lid = None if submerged else mesh.generate_lid()
+    if submerged:
+        lid = None
+    elif "max_panel_radius_m" in config:
+        # Refinement preserves the hull surface. Generate the same interior
+        # waterplane from its smaller source mesh to avoid the lid reader's
+        # temporary point-by-panel arrays scaling with refined hull size.
+        lid_config = dict(config)
+        lid_radius = lid_config.pop("max_panel_radius_m")
+        lid_vertices, lid_faces, _ = load_hull(lid_config, base, False)
+        lid_hull = cpt.Mesh(vertices=lid_vertices, faces=lid_faces, name="lid source")
+        from .hull_geometry import bounded_lid
+        lid = bounded_lid(lid_hull, lid_radius)
+    else:
+        lid = mesh.generate_lid()
 
     mass = _positive(config["mass_kg"], "mass_kg")
     mass_matrix = _mass_matrix(config, base, mass)
+
+    reflection = config.get("reflection_symmetry", False)
+    if not isinstance(reflection, bool):
+        raise ValueError("reflection_symmetry must be true or false")
+    if reflection:
+        from .geometry_format import geometry_format
+        from .hull_geometry import reflection_mesh
+        filename = config.get("geometry_file", config.get("offset_points_csv"))
+        if geometry_format(base / filename) not in {".csv", ".mgf"}:
+            raise ValueError("reflection_symmetry currently requires symmetric CSV/MGF sections")
+        parity = np.array([1., -1., 1., -1., 1., -1.])
+        if not np.isclose(center_of_mass[1], 0., atol=1e-10, rtol=0):
+            raise ValueError("reflection_symmetry requires CG on the centerline")
+        if not np.allclose(mass_matrix, parity[:, None]*mass_matrix*parity[None, :],
+                           rtol=1e-12, atol=1e-10*np.max(np.abs(mass_matrix))):
+            raise ValueError("reflection_symmetry requires reflection-symmetric inertia")
+        mesh = reflection_mesh(mesh)
+        if lid is not None:
+            lid = reflection_mesh(lid)
+        # Plane clipping can subdivide centerline-crossing panels. Export
+        # the actual full mirrored solver mesh, rather than the input faces.
+        body_vertices = mesh.vertices.copy() - geometry_translation
+        faces = mesh.faces.copy()
 
     body = cpt.FloatingBody(
         mesh=mesh,
@@ -428,6 +468,7 @@ def run(config_path: Path) -> Path:
             "forward_speed": [0.0],
             "rho": [rho],
             "g": [gravity],
+            "theta": theta,
         }
     )
 
@@ -580,6 +621,28 @@ def run(config_path: Path) -> Path:
     # time constants and ratio increments exported under vessel.powerBased.
     output_dataset["motion_rao"] = rao(output_dataset)
 
+    LOG.info("Computing diagonal mean-drift coefficients (surge, sway, yaw)")
+    # Use exactly the exported, symmetrized potential-flow motion response.
+    # Undo the FSD axis/heading conversion for the solver's Kochin functions.
+    solver_headings = np.asarray(dataset.wave_direction)
+    mss_headings = np.mod(np.pi - solver_headings, 2*np.pi)
+    indices = [int(np.argmin(abs(output_dataset.wave_direction.values - beta)))
+               for beta in mss_headings]
+    motion_solver = dataset.excitation_force.rename(influenced_dof="radiating_dof").transpose(
+        "omega", "wave_direction", "radiating_dof").copy(
+        data=output_dataset.motion_rao.transpose("omega", "wave_direction", "radiating_dof").values[:, indices, :]
+             * DOF_SIGNS)
+    drift = compute_mean_drift(dataset, motion_solver, center_of_mass)
+    angular_error = angular_difference(dataset, motion_solver, center_of_mass, drift)
+    if angular_error is not None and np.any(angular_error > .02):
+        LOG.warning("Mean-drift angular-grid norm differences (surge/sway/yaw): %s. "
+                    "Reduce mean_drift_theta_step_deg and check convergence.",
+                    ", ".join(f"{100*e:.2g}%" for e in angular_error))
+    drift = drift * xr.DataArray(DOF_SIGNS[[0, 1, 5]], dims="drift_dof",
+                                 coords={"drift_dof": drift.drift_dof})
+    output_dataset["mean_drift_force"] = drift.assign_coords(
+        wave_direction=mss_headings).sortby("wave_direction")
+
     hydrostatics = {
         "GM_T_m": gm_t,
         "volume_m3": float(immersed.volume),
@@ -614,6 +677,15 @@ def run(config_path: Path) -> Path:
         "matrix_reference": "CG",
         "submerged": submerged,
         "submergence_depth_m": submergence_depth,
+        "mean_drift": {
+            "method": "Capytaine far-field diagonal mean drift",
+            "reference": "CG; MSS FSD",
+            "normalization": "load per incident wave amplitude squared",
+            "motion_damping": "potential radiation only",
+            "theta_step_deg": float(np.rad2deg(theta[1] - theta[0])),
+            "coarser_grid_relative_norm_difference": (
+                None if angular_error is None else angular_error.tolist()),
+        },
     }
     if center_of_flotation_mss is not None:
         hydrostatics["center_of_flotation_m"] = center_of_flotation_mss
@@ -637,14 +709,15 @@ def run(config_path: Path) -> Path:
         body.name,
         rho,
         gravity,
-        output_dir / output_filename,
+        base / output_filename,
         zero_added_mass=A0,
         zero_radiation_damping=B0,
         infinite_added_mass=Ainf,
         infinite_radiation_damping=Binf,
         submerged=submerged,
         Lpp_m=lpp,
+        supporting_output_dir=output_dir,
         **damping_parameters,
     )
 
-    return output_dir
+    return base / output_filename

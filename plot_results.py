@@ -2,11 +2,13 @@
 
 Examples:
     python plot_results.py
-    python plot_results.py vessels_capytaine/capytaine_offsets_csv/testShip/results/testShip.mat --heading 90
-    python plot_results.py vessels_capytaine/mesh_stl/wigley/results/wigley.mat
+    python plot_results.py vessels_capytaine/testShip_csv/testShip.mat --heading 90
+    python plot_results.py vessels_capytaine/wigley_stl/wigley.mat
 
-Works with results from all four geometry formats. Saves six PNG files in
-plots/ beside the result unless --output-dir is supplied. The 10 rad/s
+Works with results from all four geometry formats. Saves six PNG files, plus
+a signed mean-drift plot when vessel.drift is available, in
+results/plots/ beside the result unless --output-dir is supplied. The JSON
+output_dir customizes the supporting results folder. The 10 rad/s
 coefficient marker represents infinite frequency; RAOs use finite frequencies.
 MATLAB/Octave plotVesselGeometry shows source geometry and saved solver hull
 panels together in two vertically stacked subplots; plotVesselHydrodynamics displays MSS analyses.
@@ -15,9 +17,9 @@ panels together in two vertically stacked subplots; plotVesselHydrodynamics disp
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.io import loadmat
 
@@ -26,9 +28,7 @@ DOFS = ("Surge", "Sway", "Heave", "Roll", "Pitch", "Yaw")
 DEFAULT_RESULT = (
     Path(__file__).resolve().parent
     / "vessels_capytaine"
-    / "capytaine_offsets_csv"
-    / "testShip"
-    / "results"
+    / "testShip_csv"
     / "testShip.mat"
 )
 
@@ -87,6 +87,7 @@ def plot_diagonal(
     path: Path,
     show: bool,
 ) -> None:
+    import matplotlib.pyplot as plt
     fig, axes = plt.subplots(2, 3, figsize=(13, 7), constrained_layout=True)
     for index, (dof, ax) in enumerate(zip(DOFS, axes.flat)):
         ax.plot(frequencies[:-1], matrix[index, index, :-1], marker="o", ms=3)
@@ -109,6 +110,50 @@ def plot_diagonal(
         plt.close(fig)
 
 
+def drift_data(vessel, headings, frequencies):
+    """Read Chapter 10 cells without squeezing singleton frequency/speed axes."""
+    drift = vessel.drift.item()
+    omega = np.asarray(drift.w, dtype=float).ravel()
+    if not np.array_equal(omega, frequencies[1:-1]):
+        raise ValueError("vessel.drift.w must match the finite RAO frequency grid")
+    entries = np.asarray(drift.coeff, dtype=object).ravel()
+    shape = (len(omega), len(headings), 1)
+    if len(entries) != 3 or any(np.asarray(entry).shape != shape for entry in entries):
+        raise ValueError(f"vessel.drift.coeff must contain three cells of shape {shape}")
+    if any(np.iscomplexobj(entry) for entry in entries):
+        raise ValueError("Mean-drift coefficients must be real and signed")
+    values = np.stack([np.asarray(entry, dtype=float)[:, :, 0] for entry in entries], axis=2)
+    if not np.all(np.isfinite(values)):
+        raise ValueError("Mean-drift coefficients must be finite")
+    return omega, values
+
+
+def plot_drift(omega, values, headings, path, show):
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(3, 1, figsize=(12, 11), sharex=True)
+    colors = plt.get_cmap('turbo')(np.linspace(.02, .98, len(headings)))
+    degrees = np.rad2deg(headings)
+    order = np.argsort(omega)
+    for j, (label, ax) in enumerate(zip(('Surge', 'Sway', 'Yaw'), axes)):
+        ax.axhline(0., color='0.55', linewidth=.7)
+        for k, heading in enumerate(degrees):
+            ax.plot(omega[order], values[order, k, j], color=colors[k],
+                    linestyle='-' if heading < 180 else '--', linewidth=1.1,
+                    label=f'{heading:g}°')
+        ax.set(title=label, ylabel='N/m²' if j < 2 else 'N m/m²')
+        ax.set_xlim(float(np.min(omega)), float(np.max(omega)))
+        ax.grid(True, alpha=.3)
+    axes[-1].set_xlabel('Angular frequency ω (rad/s)')
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(.5, .01),
+               ncol=min(9, len(headings)), fontsize=9, title='Propagation heading β')
+    fig.subplots_adjust(left=.1, right=.97, bottom=.17, top=.92, hspace=.28)
+    fig.suptitle('Signed mean-drift coefficients per squared wave amplitude, about CG')
+    fig.savefig(path, dpi=180)
+    if not show:
+        plt.close(fig)
+
+
 def plot_raos(
     omega: np.ndarray,
     amplitude: np.ndarray,
@@ -119,6 +164,7 @@ def plot_raos(
     output_dir: Path,
     show: bool,
 ) -> list[Path]:
+    import matplotlib.pyplot as plt
     def phase_curve_with_gaps(
         x: np.ndarray,
         y: np.ndarray,
@@ -207,12 +253,13 @@ def plot_raos(
 
 
 def main() -> None:
+    import matplotlib.pyplot as plt
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "result", nargs="?", type=Path, default=DEFAULT_RESULT,
-        help="MSS vessel .mat file (default: capytaine_offsets_csv/testShip result)",
+        help="MSS vessel .mat file (default: testShip_csv result)",
     )
     parser.add_argument(
         "--heading", type=float, default=0.0,
@@ -220,7 +267,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir", type=Path, default=None,
-        help="Directory for PNG files (default: plots/ beside the .mat file)",
+        help="Directory for PNG files (default: JSON output_dir/plots, or results/plots)",
     )
     parser.add_argument(
         "--show", action="store_true", help="Keep plot windows open",
@@ -249,7 +296,9 @@ def main() -> None:
     heading_index = int(matches[0])
     heading_deg = float(np.rad2deg(headings[heading_index]))
 
-    output_dir = args.output_dir or result_path.parent / "plots"
+    config_path = result_path.parent / 'config.json'
+    config = json.loads(config_path.read_text()) if config_path.is_file() else {}
+    output_dir = args.output_dir or result_path.parent / config.get('output_dir', 'results') / 'plots'
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs = []
     for field, filename in (("A", "added_mass.png"), ("B", "radiation_damping.png")):
@@ -261,6 +310,11 @@ def main() -> None:
         omega, amplitude, phase = rao_data(vessel, field, headings, frequencies)
         outputs.extend(plot_raos(omega, amplitude, phase, heading_index,
                                  heading_deg, field, output_dir, args.show))
+    if hasattr(vessel, 'drift'):
+        omega, values = drift_data(vessel, headings, frequencies)
+        path = output_dir / 'mean_drift.png'
+        plot_drift(omega, values, headings, path, args.show)
+        outputs.append(path)
 
     print("Saved plots:")
     for path in outputs:

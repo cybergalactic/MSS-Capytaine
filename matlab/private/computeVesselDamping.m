@@ -1,7 +1,10 @@
 function vessel = computeVesselDamping(vessel, omega_p)
-% Apply catalogue time constants using MSS equivalent matrices.
-% The saved-input call below supports both the older percentage interface
-% and the current time-constant interface, without ambiguous explicit inputs.
+% Compute power-based equivalent matrices and apply catalogue time constants.
+% This uses only the saved vessel structure and MATLAB/Octave functions.
+
+if nargin < 2 || isempty(omega_p)
+    omega_p = 1.0;
+end
 
 p = vessel.powerBased;
 if isfield(p, 'kappa_126')
@@ -33,24 +36,14 @@ if ~isnumeric(ratios) || ~isreal(ratios) || ~isvector(ratios) || ...
     error('MSSCapytaine:InvalidDamping','%s must contain %d nonnegative finite damping-ratio increments.',ratioField,numel(restored));
 end
 T = reshape(T,1,[]); ratios = reshape(ratios,1,[]);
-if submerged
-    % Keep the established submerged formulation in the installed MSS.
-    vessel = computeManeuveringModel(vessel,omega_p,T,ratios,0);
-else
-    % Ask for radiation alone through the saved-percentage compatibility
-    % interface, which both MSS versions support. An explicit [0 0 0] is
-    % invalid with the current MSS because explicit inputs now mean seconds.
-    % Apply and validate the user's actual T_126 below, reporting all failures
-    % together. The internal zero increments are not user damping settings.
-    vessel.powerBased.kappa_126 = [0 0 0];
-    vessel.powerBased.delta_zeta_345 = ratios;
-    previousWarning = warning('query','MSS:LegacyKappa126');
-    warning('off','MSS:LegacyKappa126');
-    restoreWarning = onCleanup(@() warning(previousWarning));
-    vessel = computeManeuveringModel(vessel,omega_p);
-    clear restoreWarning
-    vessel.powerBased = rmfield(vessel.powerBased,'kappa_126');
+G = zeros(6);
+G([3 4 5],[3 4 5]) = vessel.C([3 4 5],[3 4 5],1);
+heaveIsRestored = abs(G(3,3)) > 1e-10 * max(1,norm(G,'fro'));
+if submerged == heaveIsRestored
+    error('MSSCapytaine:InvalidRestoring', ...
+        'The saved submerged setting and heave restoring matrix disagree.');
 end
+vessel = powerBasedEquivalent(vessel,omega_p,G);
 m = diag(vessel.M); b = diag(vessel.powerBased.B_eq);
 if any(~isfinite(m(idx))) || any(m(idx) <= 0) || ...
         any(~isfinite(b(idx))) || any(b(idx) < 0)
@@ -84,8 +77,65 @@ end
 for k = 1:numel(idx)
     vessel.powerBased.Bv(idx(k),idx(k)) = max(0,extra(k));
 end
+for k = 1:numel(restored)
+    i = restored(k);
+    vessel.powerBased.Bv(i,i) = 2 * ratios(k) * sqrt(m(i) * G(i,i));
+end
 vessel.D = vessel.powerBased.B_eq + vessel.powerBased.Bv;
 vessel.powerBased.(timeField) = T;
 vessel.powerBased.(ratioField) = ratios;
 vessel.powerBased.(['T_max_' timeField(3:end)]) = Tmax;
+end
+
+function vessel = powerBasedEquivalent(vessel,omega_p,G)
+% The spectrum scale cancels when it is normalized; only its shape matters.
+if ~isnumeric(omega_p) || ~isreal(omega_p) || ~isscalar(omega_p) || ...
+        ~isfinite(omega_p) || omega_p <= 0
+    error('MSSCapytaine:InvalidPeakFrequency', ...
+        'omega_p must be a positive finite scalar in rad/s.');
+end
+w = vessel.freqs(:);
+finite = isfinite(w) & w < 10;
+w = w(finite);
+if numel(w) < 2 || any(w < 0) || any(diff(w) <= 0)
+    error('MSSCapytaine:InvalidFrequencies', ...
+        'At least two increasing finite frequencies below the infinity marker are required.');
+end
+% Match the JONSWAP baseline in MSS computeManeuveringModel.
+wFine = linspace(max(w(1),1e-6),w(end),1000)';
+gamma = 3.3;
+sigma = 0.09 * ones(size(wFine));
+sigma(wFine < omega_p) = 0.07;
+peak = exp(-0.5 * ((wFine - omega_p) ./ (sigma * omega_p)).^2);
+weight = wFine.^(-5) .* exp(-1.25 * (omega_p ./ wFine).^4) .* gamma.^peak;
+m0 = trapz(wFine,weight);
+if ~isfinite(m0) || m0 <= 0
+    error('MSSCapytaine:InvalidSpectrum', ...
+        'The wave-spectrum weight is zero or nonfinite on this frequency grid.');
+end
+weight = weight / m0;
+Aeq = zeros(6); Beq = zeros(6);
+for i = 1:6
+    for j = 1:6
+        Aij = reshape(vessel.A(i,j,finite,1),[],1);
+        Bij = reshape(vessel.B(i,j,finite,1),[],1);
+        Aeq(i,j) = trapz(wFine,interp1(w,Aij,wFine,'pchip') .* weight);
+        Beq(i,j) = trapz(wFine,interp1(w,Bij,wFine,'pchip') .* weight);
+    end
+end
+vessel.powerBased.omega_p = omega_p;
+vessel.powerBased.spectrumType = 'JONSWAP';
+vessel.powerBased.gamma = gamma;
+vessel.powerBased.A_eq = Aeq;
+vessel.powerBased.B_eq = Beq;
+vessel.powerBased.Bv = zeros(6);
+vessel.MA = Aeq;
+vessel.M = vessel.MRB + Aeq;
+if rank(vessel.M) < 6
+    error('MSSCapytaine:SingularInertia','The equivalent inertia matrix is singular.');
+end
+[Q,R,P] = qr(vessel.M);
+vessel.Minv = P * (R \ Q');
+vessel.G = G;
+vessel.D = Beq;
 end

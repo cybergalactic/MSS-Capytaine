@@ -1,0 +1,145 @@
+{
+  "GM_T_m": 1.77839982231667,
+  "volume_m3": 0.05365853659016853,
+  "displaced_mass_kg": 55.00000000492275,
+  "body_mass_kg": 55.0,
+  "center_of_buoyancy_m": [
+    0.2010045507578852,
+    0.00018977719979406963,
+    0.05063076420247099
+  ],
+  "waterplane_area_m2": 0.681372442846427,
+  "center_of_mass_m": [
+    0.201,
+    0.0,
+    -0.199
+  ],
+  "rotation_center_m": [
+    0.201,
+    0.0,
+    -0.199
+  ],
+  "inertia_matrix_SI": [
+    [
+      55.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      55.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      55.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      10.26432,
+      0.0,
+      -0.017622549999999997
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      13.75,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      -0.017622549999999997,
+      0.0,
+      13.75
+    ]
+  ],
+  "hydrostatic_stiffness_SI": [
+    [
+      0.0,
+      -0.0,
+      0.0,
+      0.0,
+      -0.0,
+      0.0
+    ],
+    [
+      -0.0,
+      0.0,
+      -0.0,
+      -0.0,
+      0.0,
+      -0.0
+    ],
+    [
+      0.0,
+      -0.0,
+      6851.370255931534,
+      0.0,
+      958.7918672122177,
+      0.0
+    ],
+    [
+      0.0,
+      -0.0,
+      0.0,
+      959.5356242168419,
+      -0.0,
+      0.0
+    ],
+    [
+      -0.0,
+      0.0,
+      958.7918672122177,
+      -0.0,
+      1402.3276948270352,
+      -0.0
+    ],
+    [
+      0.0,
+      -0.0,
+      0.0,
+      0.0,
+      -0.0,
+      0.0
+    ]
+  ],
+  "coordinate_system": "MSS FSD: x forward, y starboard, z down",
+  "geometry_coordinate_origin": "body-fixed origin",
+  "matrix_reference": "CG",
+  "submerged": false,
+  "submergence_depth_m": 0.0,
+  "mean_drift": {
+    "method": "Capytaine far-field diagonal mean drift",
+    "reference": "CG; MSS FSD",
+    "normalization": "load per incident wave amplitude squared",
+    "motion_damping": "potential radiation only",
+    "theta_step_deg": 0.5,
+    "coarser_grid_relative_norm_difference": [
+      9.618267004342313e-16,
+      6.555343733911482e-16,
+      0.0007274305502373265
+    ]
+  },
+  "center_of_flotation_m": [
+    0.06105837790153742,
+    0.0,
+    0.0
+  ],
+  "demihull_spacing_m": 0.79
+}

@@ -48,7 +48,7 @@ class DemihullTest(unittest.TestCase):
                     load_hull(dict(config, demihull_spacing_m=spacing), base, False)
 
     def test_spacing_is_csv_only(self):
-        for case in ("wamit_gdf/tanker", "shipx_mgf/supply", "mesh_stl/wigley"):
+        for case in ("tanker_gdf", "supply_mgf", "wigley_stl"):
             base = ROOT / "vessels_capytaine" / case
             config = json.loads((base / "config.json").read_text())
             config["demihull_spacing_m"] = 0.79
@@ -56,7 +56,7 @@ class DemihullTest(unittest.TestCase):
                 load_hull(config, base, False)
 
     def test_otter_loading_and_lid_gap(self):
-        base = ROOT / "vessels_capytaine/capytaine_offsets_csv/otter_80kg"
+        base = ROOT / "vessels_capytaine/otter_80kg_csv"
         config = json.loads((base / "config.json").read_text())
         v, f, _ = load_hull(config, base, False)
         mesh = cpt.Mesh(vertices=v, faces=f)
@@ -86,7 +86,7 @@ class DemihullTest(unittest.TestCase):
         self.assertLess(max(mesh.faces_radiuses.max(), lid.faces_radiuses.max()), wavelength_eighth)
 
     def test_light_otter_static_trim_and_rotated_inertia(self):
-        base = ROOT / "vessels_capytaine/capytaine_offsets_csv/otter_55kg"
+        base = ROOT / "vessels_capytaine/otter_55kg_csv"
         config = json.loads((base / "config.json").read_text())
         v, f, _ = load_hull(config, base, False)
         mesh = cpt.Mesh(vertices=v, faces=f)

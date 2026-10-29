@@ -12,7 +12,7 @@ from matplotlib.patches import FancyBboxPatch
 
 def main():
     root = Path(__file__).resolve().parents[1]
-    source = root / "vessels_capytaine/capytaine_offsets_csv/testShip/offset_points.csv"
+    source = root / "vessels_capytaine/testShip_csv/offset_points.csv"
     data = np.genfromtxt(source, delimiter=",", names=True)
     section = data[data["x_m"] == 0]
     waterline = np.sort(data[data["z_m"] == 0], order="x_m")

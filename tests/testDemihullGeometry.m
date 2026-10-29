@@ -3,7 +3,7 @@ function testDemihullGeometry()
 original_path=path;
 restore_path=onCleanup(@() path(original_path));
 addpath(fullfile(fileparts(which('plotVesselGeometry')),'private'));
-a=readVesselGeometry('capytaine_offsets_csv/otter_80kg');
+a=readVesselGeometry('otter_80kg_csv');
 b=readVesselGeometry('otter_80kg');
 assert(strcmp(a.path,b.path)); assert(strcmp(a.format,'csv'));
 assert(isequal(a.section_centers_m,[-0.395 0.395]));

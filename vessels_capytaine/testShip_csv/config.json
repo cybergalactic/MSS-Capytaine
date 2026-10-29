@@ -1,0 +1,65 @@
+{
+  "geometry_file": "offset_points.csv",
+  "samples_per_section": 24,
+  "number_of_stations": 60,
+  "body_name": "testShip",
+  "output_filename": "testShip.mat",
+  "center_of_mass_m": [
+    -0.0,
+    0.0,
+    1.0
+  ],
+  "mass_kg": 141954.8,
+  "R44_m": 2.4194,
+  "R55_m": 5.8156,
+  "R66_m": 6.247,
+  "R46_m": 0.0,
+  "viscous_damping": {
+    "T_126": [
+      20,
+      8,
+      20
+    ],
+    "delta_zeta_345": [
+      0,
+      0.1,
+      0
+    ],
+    "nonlinear_456": [
+      5,
+      5,
+      0
+    ]
+  },
+  "submerged": false,
+  "water_density_kg_m3": 1025.0,
+  "gravity_m_s2": 9.81,
+  "omega_rad_s": [
+    0.01,
+    0.05,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.8,
+    0.9,
+    1.2,
+    1.4,
+    1.6,
+    1.8,
+    2.0,
+    2.3,
+    2.6,
+    2.8,
+    2.9,
+    3,
+    3.1,
+    3.2,
+    3.5,
+    4,
+    4.5
+  ],
+  "output_dir": "results"
+}

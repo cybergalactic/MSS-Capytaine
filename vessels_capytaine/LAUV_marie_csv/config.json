@@ -1,0 +1,77 @@
+{
+  "geometry_file": "offset_points.csv",
+  "samples_per_section": 20,
+  "number_of_stations": 50,
+  "body_name": "LAUV_marie",
+  "output_filename": "LAUV_marie.mat",
+  "center_of_mass_m": [
+    -0.0,
+    0.0,
+    0.01
+  ],
+  "mass_kg": 34.0,
+  "R44_m": 0.053,
+  "R55_m": 0.6218,
+  "R66_m": 0.6218,
+  "R46_m": 0.0,
+  "viscous_damping": {
+    "T_1236": [
+      50.0,
+      5.0,
+      5.0,
+      5.0
+    ],
+    "delta_zeta_45": [
+      0.2,
+      0.2
+    ],
+    "nonlinear_456": [
+      5,
+      5,
+      0
+    ]
+  },
+  "submerged": true,
+  "submergence_depth_m": 1.0,
+  "water_density_kg_m3": 1025.0,
+  "gravity_m_s2": 9.81,
+  "omega_rad_s": [
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.8,
+    1.0,
+    1.2,
+    1.4,
+    1.6,
+    1.8,
+    2.0,
+    2.2,
+    2.4,
+    2.6,
+    2.8,
+    3.0,
+    3.2,
+    3.4,
+    3.6,
+    3.8,
+    4.0,
+    4.25,
+    4.5,
+    4.75,
+    5.0,
+    5.5,
+    6.0,
+    6.5,
+    7.0,
+    7.5,
+    8.0,
+    8.5,
+    9.0,
+    9.5
+  ],
+  "output_dir": "results"
+}

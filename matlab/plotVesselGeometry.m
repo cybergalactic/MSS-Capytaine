@@ -4,11 +4,11 @@ function geometry = plotVesselGeometry(case_name)
 % Before solving, the bottom subplot explains that no saved mesh is available.
 % Both use MSS FSD; no Python process or MSS installation is needed to plot.
 % Examples:
-%   plotVesselGeometry('capytaine_offsets_csv/testShip')
-%   plotVesselGeometry('capytaine_offsets_csv/otter_80kg')
-%   plotVesselGeometry('shipx_mgf/supply')
-%   plotVesselGeometry('wamit_gdf/tanker')
-%   plotVesselGeometry('mesh_stl/wigley')
+%   plotVesselGeometry('testShip_csv')
+%   plotVesselGeometry('otter_80kg_csv')
+%   plotVesselGeometry('supply_mgf')
+%   plotVesselGeometry('tanker_gdf')
+%   plotVesselGeometry('wigley_stl')
 % A JSON file path is also accepted. If the geometry filename has no known
 % extension, the reader identifies its format from the file contents.
 % MGF uses draft_m from JSON. STL must already be in metres and MSS FSD.

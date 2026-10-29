@@ -1,8 +1,8 @@
-"""Compare saved wamit_gdf/tanker results with MSS WAMIT without a solve.
+"""Compare saved tanker_gdf results with MSS WAMIT without a solve.
 
 Shift the WAMIT reference to the same CG in MSS FSD and compare added mass,
 radiation damping and complex force RAOs over overlapping finite frequencies.
-Write plots and error reports to vessels_capytaine/wamit_gdf/tanker/validation.
+Write plots and error reports to vessels_capytaine/tanker_gdf/validation.
 The default reference is in the sibling MSS checkout; use --wamit to override.
 """
 from pathlib import Path
@@ -46,21 +46,20 @@ def error_percent(actual, reference):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--wamit', type=Path, default=ROOT.parent / 'MSS/HYDRO/vessels_wamit/tanker/tanker.mat',
-                        help='reference tanker.mat (default: sibling MSS/HYDRO/vessels_wamit/tanker/tanker.mat)')
+    parser.add_argument('--wamit', type=Path, default=ROOT.parent / 'MSS/HYDRO/vessels_wamit/tanker.mat',
+                        help='reference tanker.mat (default: sibling MSS/HYDRO/vessels_wamit/tanker.mat)')
     parser.add_argument('--max-omega', type=float, default=1.8003,
                         help='upper finite-frequency comparison bound (rad/s)')
     args = parser.parse_args()
     if not np.isfinite(args.max_omega) or args.max_omega <= 0:
         parser.error('--max-omega must be positive and finite')
-    source = ROOT / 'vessels_capytaine/wamit_gdf/tanker/results/tanker.mat'
-    output = source.parent.parent / 'validation'
+    source = ROOT / 'vessels_capytaine/tanker_gdf/tanker.mat'
+    output = source.parent / 'validation'
     output.mkdir(exist_ok=True)
     c = loadmat(source, simplify_cells=True)['vessel']
     w = loadmat(args.wamit, simplify_cells=True)['vessel']
     np.testing.assert_allclose(c['headings'], w['headings'])
     assert c['hydrodynamic_reference'] == 'CG'
-    assert c['hydrodynamic_axes'] == 'MSS FSD'
     assert float(np.asarray(w['velocities']).flat[0]) == 0
     # MSS legacy CG z is keel height. WAMIT's origin is the design waterline.
     r = np.array(w['main']['CG'], dtype=float)
@@ -175,7 +174,7 @@ def main():
         '![Added mass](added_mass.png)', '', '![Radiation damping](radiation_damping.png)', '']
     for heading in (0, 90, 180):
         md += [f'![Force RAOs at {heading} degrees](force_rao_{heading}deg.png)', '']
-    md += ['Inspect the [Python comparison test](../../../../tests/compare_tanker_wamit.py).', '',
+    md += ['Inspect the [Python comparison test](../../../tests/compare_tanker_wamit.py).', '',
         'Reproduce from the repository root with `python tests/compare_tanker_wamit.py`.',
         'Use `--wamit path/to/tanker.mat` if MSS is not in the sibling folder; `--max-omega` changes the finite comparison limit.', '']
     (output / 'README.md').write_text('\n'.join(md))

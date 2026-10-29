@@ -10,13 +10,13 @@ python tests/otter/generate_offsets.py
 
 This performs geometry fitting only, not a BEM solve. Both configurations use `mass_kg`, `R44_m`, `R55_m`, `R66_m` and signed `R46_m`. The cross term is `mass_kg × R46_m × abs(R46_m)`; omission defaults to zero. The generator rounds JSON CG coordinates and radii to four decimal places. The more detailed values below describe the fitted construction before JSON rounding; they do not imply measured hull accuracy. Rotational inertia changes by less than 0.01% under this rounding. The case offset CSV retains numerical precision to preserve the constructed mesh, without claiming physical accuracy.
 
-The current additional roll damping ratio is 0.2, guided by MSS `otter.m` as a starting estimate. Under the plotting default `omega_p = 0.8 rad/s`, the equivalent roll radiation damping is about 0.0585 and 0.0668 N m s/rad for 55 kg and 80 kg. The total uncoupled roll ratio is approximately 0.2002. It remains an assumed damping setting, not experimental calibration. Choose the weighting peak in `plotVesselHydrodynamics(case, omega_p)` or the corresponding MSS processing during post-processing, independently of the BEM solve. Keep it tied to the physical sea state.
+The current additional roll damping ratio is 0.2, guided by MSS `otter.m` as a starting estimate. Under the default JONSWAP reference (peak 1.0 rad/s, gamma 3.3), the equivalent roll radiation damping is about 0.1551 and 0.1766 N m s/rad for 55 kg and 80 kg. The total uncoupled equivalent-model roll ratio is approximately 0.2005. It remains an assumed damping setting, not experimental calibration. An explicit weighting peak in `plotVesselHydrodynamics(case, omega_p)` selects another post-processing reference without a BEM solve.
 
-Both JSON cases use total surge/sway/yaw targets `T_126 = [5, 0.5, 1]` s. The user identifies these as sea-trial-calibrated values in MSS `otter.m`. They are starting values for the approximate wave model; transferring them to its new inertia/reference point and to the 55 kg loading still needs validation. They replace the uncalibrated 5% radiation-damping correction. The local MATLAB helper computes additional viscous damping as M_ii/T_i minus B_eq,ii, reports T_max, and rejects negative increments. MSS itself is unchanged. Damping-only edits can be applied with `python main.py <case> --update-damping`.
+Both JSON cases use total surge/sway/yaw targets `T_126 = [5, 0.5, 1]` s. The user identifies these as sea-trial-calibrated values in MSS `otter.m`. They are starting values for the approximate wave model; transferring them to its new inertia/reference point and to the 55 kg loading still needs validation. They replace the uncalibrated 5% radiation-damping correction. The local MATLAB helper computes additional viscous damping as M_ii/T_i minus B_eq,ii, reports T_max, and rejects negative increments. Damping-only edits can be applied with `python main.py <case> --update-damping`.
 
 ## 80 kg derivation
 
-This case demonstrates CSV demi-hull meshing for a rigid catamaran using the **MSS default 80 kg loading: 55 kg vessel plus a 25 kg point payload at the MSS body origin**. It is an idealized Otter-like underwater hull, not a measured or manufacturer-approved reconstruction. Its wave coefficients have not been validated against an Otter experiment or reference solver. The companion [55 kg case](../../vessels_capytaine/capytaine_offsets_csv/otter_55kg/README.md) uses the same physical hull at a lower waterline, with no added payload. The names identify loading conditions, not different vessel designs.
+This case demonstrates CSV demi-hull meshing for a rigid catamaran using the **MSS default 80 kg loading: 55 kg vessel plus a 25 kg point payload at the MSS body origin**. It is an idealized Otter-like underwater hull, not a measured or manufacturer-approved reconstruction. Its wave coefficients have not been validated against an Otter experiment or reference solver. The companion [55 kg case](../../vessels_capytaine/otter_55kg_csv/README.md) uses the same physical hull at a lower waterline, with no added payload. The names identify loading conditions, not different vessel designs.
 
 ## Sources and assumptions
 
@@ -78,10 +78,10 @@ plotVesselGeometry('otter_80kg')
 Run from the repository root:
 
 ```sh
-python main.py capytaine_offsets_csv/otter_80kg
+python main.py otter_80kg_csv
 ```
 
-Then repeat the geometry plot to see the saved mesh below the source sections. Inspect mesh resolution, the two separate hulls, flotation and the internal free-surface lid; refine sampling and compare coefficients before relying on the results. Hydrodynamic plotting requires MSS on the MATLAB/Octave path:
+Then repeat the geometry plot to see the saved mesh below the source sections. Inspect mesh resolution, the two separate hulls, flotation and the internal free-surface lid; refine sampling and compare coefficients before relying on the results. Hydrodynamic plotting works without MSS on the MATLAB/Octave path:
 
 ```matlab
 plotVesselHydrodynamics('otter_80kg')
@@ -106,13 +106,13 @@ Public sources report different masses and often omit a loading breakdown:
 | [SeaBee/NIVA infrastructure report (2025)](https://seabee.no/wp-content/uploads/2025/07/8120-2025-SeaBees-Drone-and-Sensor-Infrastructure.pdf), p. 29 | 85 kg with batteries; 30 kg maximum payload | Operator inventory/performance specification; not a measured 30 kg mission payload. |
 | [Current manufacturer specification](https://www.maritimerobotics.com/otter) | 62 kg dry; 30 kg payload capacity | A different specification from the historical 55 kg vessel; capacity is not typical carried mass. |
 
-The sources do not establish a universal Otter operating mass. A 25 kg payload is an illustrative MSS loading choice, not a demonstrated typical research payload. These cases retain the historical MSS 55 kg base mass and offer 55 kg and 80 kg alternatives without changing MSS defaults or claiming to reproduce either experiment. Choose the case at simulation initialization. Both exported matrices are at their respective CGs; future use at a fixed MSS body origin must account for each case's CG and waterline-origin shift. Each case's the equilibrium records below records its exact pose and point transform from the common unloaded, level body frame for future MSS integration.
+The sources do not establish a universal Otter operating mass. A 25 kg payload is an illustrative MSS loading choice, not a demonstrated typical research payload. These cases retain the historical MSS 55 kg base mass and offer 55 kg and 80 kg alternatives without changing MSS defaults or claiming to reproduce either experiment. Choose the case at simulation initialization. Both exported matrices are at their respective CGs; use at a fixed body origin requires each case's CG and waterline-origin shift. The equilibrium records below specify the exact pose and point transform from the common unloaded, level body frame.
 
 See the [JSON guide](../../How%20to%20configure%20the%20vessel%20JSON%20file.md#twin-hulls-and-catamarans).
 
 ## 55 kg derivation
 
-This is the **MSS 55 kg base vessel with no added payload**. It is paired with [otter_80kg](../../vessels_capytaine/capytaine_offsets_csv/otter_80kg/README.md), which adds a 25 kg point payload at the MSS body origin. Both use the same assumed physical demi-hull shape, not two independently resized hull designs.
+This is the **MSS 55 kg base vessel with no added payload**. It is paired with [otter_80kg](../../vessels_capytaine/otter_80kg_csv/README.md), which adds a 25 kg point payload at the MSS body origin. Both use the same assumed physical demi-hull shape, not two independently resized hull designs.
 
 The companion case README records the MSS dimensions, published sources, geometry assumptions and payload discussion. These are idealized Otter-like contours, not measured hull lines. Hasan and co-authors' 2023 paper reports 55 kg total, but does not establish the loading breakdown needed to reproduce its experiment exactly. This case uses MSS's own base-vessel CG and inertia.
 
@@ -137,7 +137,7 @@ Removing the payload changes the physical equilibrium trim. Relative to the unlo
 
 ## Preview and solve
 
-Both loads use the same **76-point finite frequency grid**, from 0.2 to 9.5 rad/s, retaining all 24 original samples. Spacing is 0.25 rad/s from 2 to 4.5 rad/s, 0.1 rad/s from 4.5 to 9 rad/s, and 0.05 rad/s from 7.5 to 8.5 rad/s to resolve the sharp features near 8 rad/s. See the companion [frequency-grid guidance](../../vessels_capytaine/capytaine_offsets_csv/otter_80kg/README.md#preview-and-solve). Rerun results made with the previous grid. More frequency samples resolve features; mesh convergence must still establish their numerical reliability.
+Both loads use the same **76-point finite frequency grid**, from 0.2 to 9.5 rad/s, retaining all 24 original samples. Spacing is 0.25 rad/s from 2 to 4.5 rad/s, 0.1 rad/s from 4.5 to 9 rad/s, and 0.05 rad/s from 7.5 to 8.5 rad/s to resolve the sharp features near 8 rad/s. See the companion [frequency-grid guidance](../../vessels_capytaine/otter_80kg_csv/README.md#preview-and-solve). Rerun results made with the previous grid. More frequency samples resolve features; mesh convergence must still establish their numerical reliability.
 
 ```matlab
 addpath('/path/to/MSS-Capytaine/matlab')
@@ -147,10 +147,10 @@ plotVesselGeometry('otter_55kg')
 Run from the repository root:
 
 ```sh
-python main.py capytaine_offsets_csv/otter_55kg
+python main.py otter_55kg_csv
 ```
 
-Then repeat the geometry plot to compare source sections with saved panels. Use `plotVesselHydrodynamics('otter_55kg')` with MSS on the MATLAB/Octave path. The output is `results/otter_55kg.mat`; the 80 kg case writes a separate file.
+Then repeat the geometry plot to compare source sections with saved panels. Use `plotVesselHydrodynamics('otter_55kg')` with the MSS-Capytaine MATLAB directory on the path. The output is `otter_55kg.mat`; the 80 kg case writes a separate file.
 
 To reproduce both original geometries and loading properties:
 
@@ -158,7 +158,7 @@ To reproduce both original geometries and loading properties:
 python tests/otter/generate_offsets.py
 ```
 
-See the provenance records below. Select a loading case when initializing a future MSS simulation. Forces/matrices are exported at each load's CG; a fixed MSS body-origin model must account for that reference change, rather than changing only the scalar mass.
+See the provenance records below. Select a loading case at simulation initialization. Forces/matrices are exported at each load's CG; a fixed MSS body-origin model must account for that reference change, rather than changing only the scalar mass.
 
 ## otter_55kg equilibrium record
 

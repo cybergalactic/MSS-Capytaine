@@ -75,7 +75,7 @@ class CoordinatesTest(unittest.TestCase):
                 load_hull({"geometry_file": "hull.CSV"}, base, False)
 
     def test_catalogue_config_and_panels(self):
-        for case in ("capytaine_offsets_csv/testShip", "capytaine_offsets_csv/LAUV_marie", "wamit_gdf/tanker"):
+        for case in ("testShip_csv", "LAUV_marie_csv", "tanker_gdf"):
             with self.subTest(case=case):
                 base = ROOT / "vessels_capytaine" / case
                 config = json.loads((base / "config.json").read_text())
@@ -83,7 +83,7 @@ class CoordinatesTest(unittest.TestCase):
                 v, f, _ = load_hull(config, base, config["submerged"])
                 self.assertTrue(np.isfinite(v).all())
                 self.assertGreater(cpt.Mesh(vertices=v, faces=f).volume, 0)
-                if case == "wamit_gdf/tanker":
+                if case == "tanker_gdf":
                     original = cpt.load_mesh(str(base / "tanker.gdf")).merged()
                     self.assertEqual(len(f), 4750)
                     # The composed file->solver->public transform is WAMIT->FSD.

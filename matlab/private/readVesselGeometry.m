@@ -1,6 +1,6 @@
 function geometry = readVesselGeometry(case_name)
 % Read source CSV/MGF/GDF/STL without a solve. Returned coordinates are MSS FSD.
-% Accept a catalogue case (group/vessel or unique name), or a JSON file path.
+% Accept a catalogue folder, a unique body_name, or a JSON file path.
 % isfile checks an actual path; exist(...,'file') also finds MSS functions
 % such as tanker.m or supply.m on the MATLAB path for a short vessel name.
 if isfile(char(case_name))
@@ -29,8 +29,12 @@ end
 format = detectFormat(path);
 geometry = struct('name', vessel_name, 'format', format, 'path', path, ...
     'config_path', config_path, 'results_dir', fullfile(case_dir,'results'), ...
+    'vessel_path', fullfile(case_dir,[vessel_name '.mat']), ...
     'vertices', [], 'faces', [], 'sections', {{}}, 'wetted_sections', {{}}, ...
     'center_of_mass_m', [], 'section_centers_m', 0);
+if isfield(config,'output_filename')
+    geometry.vessel_path=fullfile(case_dir,char(config.output_filename));
+end
 if isfield(config,'demihull_spacing_m')
     spacing=config.demihull_spacing_m;
     if ~strcmp(format,'csv')
