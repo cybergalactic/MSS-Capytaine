@@ -1,6 +1,6 @@
 # MSS-Capytaine
 
-Version **1.2** · [Release notes and migration](CHANGELOG.md)
+Version **1.2** · [Repository layout](#repository-layout)
 
 MSS-Capytaine is a Python add-on for the [Marine Systems Simulator (MSS)](https://github.com/cybergalactic/MSS). It uses the open-source [Capytaine](https://capytaine.org/) boundary-element solver to compute 6-DOF linear potential-flow hydrodynamics and exports the results as the standard MATLAB/Octave `vessel` structure used by MSS.
 
@@ -368,7 +368,7 @@ BibTeX:
   author  = {Fossen, Thor I.},
   title   = {MSS-Capytaine},
   year    = {2026},
-  url     = {https://github.com/cybergalactic/MSS-Capytaine}
+  url     = "https://github.com/cybergalactic/MSS-Capytaine"
 }
 ```
 
