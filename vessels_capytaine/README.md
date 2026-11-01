@@ -35,6 +35,6 @@ All public geometry and results use MSS FSD. MGF/GDF keep their native file conv
 
 The MGF cases produce zero-speed data. The solver exports diagonal Capytaine mean drift in `vessel.drift`, included in all eight supplied vessel MAT files. The testShip case also includes a line plot of the signed coefficients at all 36 headings. Cross-frequency QTFs are not computed.
 
-MATLAB/Octave post-processing uses the fixed JONSWAP reference with peak 1.0 rad/s and gamma 3.3 unless an explicit peak is supplied. Damping settings are example inputs, checked for nonnegative additional viscous damping at that reference. See the [release notes](../CHANGELOG.md) for the 1.2 folder and output-path migration.
+MATLAB/Octave post-processing uses the fixed JONSWAP reference with peak 1.0 rad/s and gamma 3.3 unless an explicit peak is supplied. Damping settings are example inputs, checked for nonnegative additional viscous damping at that reference. See the [repository layout](../README.md#repository-layout) for the current vessel folders and output paths.
 
 Geometry readers supply geometry only; Capytaine solves every case. Additional geometry formats can follow the same interface. No ShipX result comparison is required.
