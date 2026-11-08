@@ -2,11 +2,11 @@
 
 Version **1.2** · [Repository layout](#repository-layout)
 
-MSS-Capytaine is a Python add-on for the [Marine Systems Simulator (MSS)](https://github.com/cybergalactic/MSS). It uses the open-source [Capytaine](https://capytaine.org/) boundary-element solver to compute 6-DOF linear potential-flow hydrodynamics and exports the results as the standard MATLAB/Octave `vessel` structure used by MSS.
+MSS-Capytaine is a Python add-on for the [Marine Systems Simulator (MSS)](https://github.com/cybergalactic/MSS), maintained independently of the [Capytaine](https://capytaine.org/) project. It uses the Capytaine boundary-element solver to compute 6-DOF linear potential-flow hydrodynamics and exports the results as the standard MATLAB/Octave `vessel` structure used by MSS.
 
 The project provides an open-source hydrodynamic-data workflow for MSS users without access to the commercial potential-flow solvers. Capytaine performs the boundary-element calculations; this repository includes standalone MATLAB and GNU Octave result viewers. MSS provides model refinement and time-domain simulation after export.
 
-**License and use.** You may use, copy, modify, distribute and sell the code, including for commercial applications, under the [MIT License](LICENSE). Retain the copyright and license notices in copies or substantial portions of the code. Third-party geometry retains its documented license terms.
+**License and use.** The original MSS-Capytaine code is available under the [MIT License](LICENSE), including for commercial use. See [License](#license) for the Capytaine adaptation.
 
 **Use at your own risk.** This software is supplied without warranty or guarantee of accuracy, reliability, safety or fitness for a particular purpose. Users are responsible for validating results and ensuring safe application. To the extent permitted by law, the author and contributors accept no liability for accidents, personal injury, property damage or other loss arising from its use. See the [MIT license](LICENSE).
 
@@ -374,7 +374,9 @@ BibTeX:
 
 ## License
 
-The application code is distributed under the [MIT License](LICENSE), copyright 2026 Thor I. Fossen, with no warranty and a limitation of liability. Third-party geometry retains its own notices and terms; the adapted [Wigley STL](vessels_capytaine/wigley_stl/README.md#source-and-licence) is distributed under CC BY-SA 4.0.
+The original MSS-Capytaine code is distributed under the [MIT License](LICENSE), copyright 2026 Thor I. Fossen. Retain the copyright and license notices in copies or substantial portions of that code.
+
+Capytaine 3.x is installed separately and is licensed under Apache 2.0. The `bounded_lid` routine in [`src/hull_geometry.py`](src/hull_geometry.py) adapts Capytaine 3.0.0's `Mesh.generate_lid` and is distributed under [Apache 2.0](LICENSES/Apache-2.0.txt).
 
 ## Related projects
 
