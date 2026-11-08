@@ -18,6 +18,11 @@ def reflection_mesh(mesh):
     return cpt.ReflectionSymmetricMesh(half, plane="xOz", name=mesh.name)
 
 
+# Adapted from Mesh.generate_lid in Capytaine 3.0.0 (capytaine/meshes/meshes.py).
+# Copyright 2025 Mews Labs
+# Licensed under Apache 2.0. See LICENSES/Apache-2.0.txt.
+# MSS-Capytaine fixes the lid at z = 0 and processes candidate vertices in
+# batches to limit memory use.
 def bounded_lid(mesh, max_radius):
     """Generate Capytaine's interior lid with bounded temporary arrays.
 
